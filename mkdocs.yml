@@ -47,6 +47,7 @@ nav:
       - Job processing: 'job-processing.md'
       - Backup and restore: 'backup-and-restore.md'
   - User guide:
+      - Movie journal (fork): 'user-guide/movie-journal.md'
       - Overview: 'user-guide/index.md'
       - Movie tracking: 'user-guide/tracking-movies.md'
       - Browsing movies and people: 'user-guide/browsing-movies-and-people.md'

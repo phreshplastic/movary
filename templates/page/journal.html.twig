@@ -1,0 +1,37 @@
+{% extends 'base.html.twig' %}
+{% block title %}Your movie journal{% endblock %}
+{% block stylesheets %}<link rel="stylesheet" href="{{ asset_url('css/journal.css') }}">{% endblock %}
+{% block scripts %}<script src="{{ asset_url('js/journal.js') }}"></script>{% endblock %}
+{% block body %}
+{{ include('component/navbar.html.twig') }}
+<main class="journal-shell">
+    <header class="journal-heading">
+        <div><p class="journal-eyebrow">A record of your movie life</p><h1>Your movie journal<span>.</span></h1>
+        <p class="journal-intro">Remember a few more? Paste them in. Keep the dates you know and the reactions you actually felt.</p></div>
+        <span class="journal-private"><i class="bi bi-lock"></i> Private to you</span>
+    </header>
+    <div class="journal-layout">
+        <section class="journal-card" aria-labelledby="intake-title">
+            <div class="journal-card-heading"><span class="journal-step" id="step-number">01</span><div><h2 id="intake-title">What have you watched?</h2><p id="step-description">One title per line. A handful or a hundred.</p></div></div>
+            <div id="paste-panel">
+                <label class="visually-hidden" for="recall">Movies you confirm watching</label>
+                <textarea id="recall" rows="10" spellcheck="false" placeholder="Arrival (2016) | Loved&#10;Alien (1979) | Liked | 2020-05-12&#10;&#10;Or just paste movie titles, one per line."></textarea>
+                <p class="journal-help">Optional: <code>Title (year) | reaction | YYYY-MM-DD | note</code><br>Leave dates blank if you don't remember. Your reactions stay in your words.</p>
+                <label class="journal-confirm"><input type="checkbox" id="watched-confirmation"> These are movies I've watched.</label>
+                <button class="journal-primary" id="find-matches">Find my movies <span aria-hidden="true">→</span></button>
+            </div>
+            <div id="matches-panel" hidden><div id="matches"></div><div class="journal-actions"><button class="journal-secondary" id="back-paste">Edit my list</button><button class="journal-primary" id="review-changes">Review changes →</button></div></div>
+            <div id="review-panel" hidden><div id="changes"></div><p class="journal-help">Saving updates your journal and Movary together. A recovery checkpoint is created first. Existing watches won't gain another play.</p><div class="journal-actions"><button class="journal-secondary" id="back-matches">Back to matches</button><button class="journal-primary" id="save-journal">Save to my journal</button></div></div>
+            <div id="saved-panel" hidden><div class="journal-success-mark">✓</div><h3>Another piece of your movie story.</h3><p id="save-summary"></p><button class="journal-primary" id="add-more">Add more movies</button></div>
+            <div id="journal-status" role="status" aria-live="polite"></div>
+        </section>
+        <aside class="journal-aside">
+            <section class="journal-stats"><p class="journal-eyebrow">Your collection</p><strong id="seen-count">{{ journal.films|filter(f => f.status == 'Seen')|length }}</strong><p>movies remembered</p><div class="journal-aside-rule"></div><p>Every reaction adds a little more context for finding your next great watch.</p></section>
+            <section class="journal-export"><h2>Take your taste with you.</h2><p>Your history and reactions belong to you. Download them for any model, any time.</p><a href="{{ applicationUrl }}/journal/export/context">Download movie context <i class="bi bi-arrow-down-right"></i></a><a href="{{ applicationUrl }}/journal/export/csv">Download CSV <i class="bi bi-arrow-down-right"></i></a></section>
+        </aside>
+    </div>
+    <section class="journal-history"><div class="journal-history-heading"><h2>A few pages from your journal</h2><span>Reactions, exactly as you gave them</span></div><div class="journal-film-grid">
+        {% for film in journal.films|filter(f => f.status == 'Seen')|slice(0, 6) %}<article><span class="journal-year">{{ film.year }}</span><h3>{{ film.title }}</h3><span class="journal-reaction">{{ film.reaction ?: 'Watched' }}</span></article>{% endfor %}
+    </div></section>
+</main>
+{% endblock %}
