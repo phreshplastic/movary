@@ -7,3 +7,5 @@ docker-compose.override.yml
 tmp/*
 .vscode
 http-client.private.env.json
+__pycache__/
+*.pyc
