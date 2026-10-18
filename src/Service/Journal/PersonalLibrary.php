@@ -288,7 +288,7 @@ class PersonalLibrary
     private function assessment(int $userId, string $action, array $before, array $after, array $input, array $scope) : array
     {
         $reaction = $this->text($input['reaction'] ?? '', 2000);
-        $note = $this->text($input['note'] ?? '', 10000);
+        $note = $this->text($input['note'] ?? ($action === 'edit_assessment' && $scope['season'] === null ? $before['note'] : ''), 10000);
         $date = $this->date($input['date'] ?? null);
         $progress = $action === 'set_progress' ? $this->progress($before, $input) : '';
         if ($action === 'edit_assessment' && $before['viewing_status'] !== 'seen') {
@@ -355,7 +355,7 @@ class PersonalLibrary
         if ($reaction !== '' || $action === 'edit_assessment') {
             $after['reaction'] = $reaction;
         }
-        if ($note !== '') {
+        if ($note !== '' || $action === 'edit_assessment') {
             $after['note'] = $note;
         }
 

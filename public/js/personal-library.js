@@ -144,6 +144,7 @@
         const today = new Date(); today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
         $('watch-date').value = today.toISOString().slice(0, 10);
         const initialAction = params.get('action') || 'log_watch';
+        if (initialAction === 'edit_assessment' && params.get('title')) {location.replace(`${base}/titles/${encodeURIComponent(params.get('title'))}#reactions`); return;}
         const resolveId = params.get('resolve');
         if (initialAction === 'set_interest') $('log-heading').textContent = 'Save a title';
         if (resolveId) $('log-heading').textContent = 'Match this title';
@@ -172,7 +173,7 @@
             const match = $('selected-title'); match.replaceChildren(poster(candidate.poster, candidate.title, 'selected-poster'));
             const info = el('div'); info.append(el('h2', candidate.title), el('p', `${candidate.year || 'Year unknown'} · ${candidate.mediaType === 'tv' ? 'TV show' : 'Movie'}`, 'text-body-secondary mb-0')); match.append(info);
             $('existing-context').textContent = local ? `${statusLabel(local.viewing_status)}${local.reaction ? ' · ' + local.reaction : ''}` : 'No viewing record in your library yet.';
-            $('watch-reaction').value = initialAction === 'edit_assessment' ? local?.reaction || '' : '';
+            $('watch-reaction').replaceChildren(...reactionSelect(initialAction === 'edit_assessment' ? local?.reaction || '' : '').options);
             $('watch-note').value = initialAction === 'edit_assessment' ? local?.note || '' : '';
             $('watch-interest').value = local?.interest === 'none' ? 'want' : local?.interest || 'want';
             $('watch-action').value = initialAction;
@@ -201,6 +202,7 @@
         $('watch-cancel').onclick = () => {$('watch-form').hidden = true; $('catalog-query').focus();};
         $('watch-form').addEventListener('input', () => {if (!frozenChanges) requestId = stableRequest(); mode();});
         $('watch-action').onchange = () => {
+            if ($('watch-action').value === 'edit_assessment' && local) {location.assign(`${base}/titles/${local.id}#reactions`); return;}
             if ($('watch-action').value === 'edit_assessment' && local && !$('watch-season').value) {
                 $('watch-reaction').value = local.reaction || ''; $('watch-note').value = local.note || '';
             }
@@ -238,6 +240,80 @@
         }
     }
 
+    function reactionSelect(reaction = '') {
+        const select = el('select', undefined, 'form-select');
+        select.append(new Option('No assessment', ''));
+        for (const word of reactionWords) select.append(new Option(word, word));
+        // Older words remain readable until the user explicitly replaces them.
+        if (reaction && !reactionWords.includes(reaction)) select.append(new Option(reaction, reaction));
+        select.value = reaction;
+        return select;
+    }
+
+    function reactionEditor(title, onSaved = () => {}, onBusy = () => {}) {
+        const form = el('form', undefined, 'reaction-editor'); form.id = 'reactions'; form.setAttribute('aria-label', `${title.title} reactions`);
+        form.append(el('h2', 'Your reactions'));
+        if (title.media_type === 'tv') form.append(el('p', 'Rate the show, individual seasons, or both. No assessment means no opinion.', 'small text-body-secondary'));
+        const fields = el('fieldset');
+        const table = el('table', undefined, 'reaction-table');
+        const head = el('thead'), heading = el('tr');
+        for (const name of [title.media_type === 'tv' ? 'Show / season' : 'Movie', 'Reaction', 'Notes']) {const cell = el('th', name); cell.scope = 'col'; heading.append(cell);}
+        head.append(heading); const body = el('tbody'); table.append(head, body); fields.append(table); form.append(fields);
+        const scopes = [{season:null, label:title.media_type === 'tv' ? 'Overall show' : 'Overall', reaction:title.reaction, note:title.note}];
+        if (title.media_type === 'tv') {
+            const seasons = new Map((title.metadata.seasons || []).map(season => [Number(season.season_number), season.name || `Season ${season.season_number}`]));
+            for (const entry of title.seasonAssessments || []) if (!seasons.has(Number(entry.season))) seasons.set(Number(entry.season), `Season ${entry.season}`);
+            for (const [season, label] of [...seasons].sort((a,b) => a[0] - b[0])) {
+                const current = (title.seasonAssessments || []).find(entry => Number(entry.season) === season);
+                scopes.push({season, label, reaction:current?.reaction || '', note:current?.note || ''});
+            }
+            if (seasons.size === 0) form.append(el('p', 'Season details are unavailable. You can still edit your overall reaction.', 'small text-body-secondary'));
+        }
+        const rows = scopes.map(scope => {
+            const row = el('tr'), name = el('th', scope.label), reactionCell = el('td'), noteCell = el('td'); name.scope = 'row';
+            const reaction = reactionSelect(scope.reaction); reaction.setAttribute('aria-label', `${scope.label} reaction`);
+            const note = el('textarea', undefined, 'form-control'); note.rows = 1; note.maxLength = 10000; note.placeholder = 'Add a note…'; note.value = scope.note || ''; note.setAttribute('aria-label', `${scope.label} notes`);
+            reactionCell.append(reaction); noteCell.append(note); noteCell.className = 'reaction-note'; row.append(name, reactionCell, noteCell); body.append(row);
+            return {...scope, reaction, note, originalReaction:scope.reaction || '', originalNote:scope.note || ''};
+        });
+        const footer = el('div', undefined, 'reaction-editor-footer'), button = el('button', 'Save changes', 'btn btn-primary'); button.type = 'submit'; button.disabled = true;
+        const status = el('p', '', 'small text-body-secondary mb-0'); status.setAttribute('role','status'); footer.append(button, status); form.append(footer);
+        let pending = null, busy = false;
+        const changed = () => rows.filter(row => row.reaction.value !== row.originalReaction || row.note.value !== row.originalNote);
+        const leaving = event => {if (pending || changed().length) {event.preventDefault(); event.returnValue = '';}};
+        window.addEventListener('beforeunload', leaving);
+        form.oninput = () => {if (!pending) {const count = changed().length; button.disabled = !count; status.textContent = count ? `${count} unsaved ${count === 1 ? 'change' : 'changes'}` : '';}};
+        form.onsubmit = async event => {
+            event.preventDefault(); if (busy || (!pending && !changed().length)) return;
+            busy = true; fields.disabled = true; button.disabled = true; button.textContent = 'Saving…'; onBusy(true);
+            try {
+                if (!pending) {
+                    const latest = (await api('title', {id:title.id})).title;
+                    if (latest.version !== title.version) throw new Error('This title changed in another tab. Reload before editing to see the latest reactions.');
+                    pending = {index:0, items:changed().map(row => ({requestId:stableRequest(), change:{action:'edit_assessment', titleId:title.id, season:row.season, reaction:row.reaction.value, note:row.note.value.trim(), date:null}}))};
+                }
+                // Each scoped edit has its own durable receipt; retries resume without repeating saved rows.
+                while (pending.index < pending.items.length) {
+                    const item = pending.items[pending.index];
+                    await save([item.change], item.requestId); pending.index++;
+                }
+                const latest = (await api('title', {id:title.id})).title;
+                for (const {change} of pending.items) {
+                    const actual = change.season === null ? latest : latest.seasonAssessments.find(entry => Number(entry.season) === change.season);
+                    if (!actual || actual.reaction !== change.reaction || actual.note !== change.note) throw new Error('The saved reactions could not be verified. Retry to check again.');
+                }
+                Object.assign(title, latest); pending = null;
+                for (const row of rows) {row.originalReaction = row.reaction.value; row.originalNote = row.note.value.trim(); row.note.value = row.originalNote;}
+                fields.disabled = false; status.textContent = 'Saved'; button.textContent = 'Save changes';
+                Promise.resolve(onSaved(latest)).catch(failure => error(failure.message));
+            } catch (failure) {
+                status.textContent = failure.message + (pending ? ` ${pending.index} of ${pending.items.length} changes saved. Retry to finish the same changes.` : '');
+                if (!pending) fields.disabled = false;
+            } finally {busy = false; button.disabled = !pending && !changed().length; button.textContent = pending ? 'Retry save' : 'Save changes'; onBusy(false);}
+        };
+        return {element:form, dirty:() => !!pending || changed().length > 0, busy:() => busy, destroy:() => window.removeEventListener('beforeunload', leaving)};
+    }
+
     async function titlePage() {
         const id = root.dataset.titleId;
         const result = await api('title', {id}); const title = result.title;
@@ -252,17 +328,14 @@
         if (metadata.filmmakers?.length) {
             const makers = el('p', undefined, 'filmmaker-links small mt-3');
             makers.append(el('span', title.media_type === 'tv' ? 'Created by ' : 'Directed by ', 'text-body-secondary'));
-            metadata.filmmakers.forEach((person, index) => {if (index) makers.append(el('span', ', ')); makers.append(link(person.name, `/library?person=${encodeURIComponent(person.id)}`));});
+            [...new Map(metadata.filmmakers.map(person => [person.id, person])).values()].forEach((person, index) => {if (index) makers.append(el('span', ', ')); makers.append(link(person.name, `/library?person=${encodeURIComponent(person.id)}`));});
             content.append(makers);
         }
         if (metadata.overview) content.append(el('p', metadata.overview, 'title-overview'));
-        const assessment = el('section', undefined, 'personal-assessment'); assessment.append(el('h2', 'Your context'), el('p', title.reaction || statusLabel(title.viewing_status), 'current-reaction'));
-        if (title.note) assessment.append(el('p', title.note, 'preserve-lines'));
-        content.append(assessment);
-        const actions = el('div', undefined, 'title-actions');
-        actions.append(link(title.viewing_status === 'seen' ? 'Add another viewing' : 'Mark as watched', `/log-watch?title=${id}`, 'btn btn-primary'));
-        if (title.viewing_status === 'seen') actions.append(link('Edit reaction', `/log-watch?title=${id}&action=edit_assessment`, 'btn btn-outline-secondary'));
-        actions.append(link(title.interest === 'want' ? 'On wishlist' : title.interest === 'not_interested' ? 'Not interested' : 'Save to a list', `/log-watch?title=${id}&action=set_interest`, 'btn btn-outline-secondary'));
+        if (title.viewing_status === 'seen') content.append(reactionEditor(title, async () => {nextHistory = 0; $('viewing-history').replaceChildren(); await loadHistory();}).element);
+        const actions = el('div', undefined, 'title-actions title-secondary-actions');
+        actions.append(link(title.viewing_status === 'seen' ? 'Add a viewing' : 'Mark as watched', `/log-watch?title=${id}`, 'small'));
+        actions.append(link(title.interest === 'want' ? 'On wishlist' : title.interest === 'not_interested' ? 'Not interested' : 'Save to wishlist or another list', `/log-watch?title=${id}&action=set_interest`, 'small'));
         content.append(actions);
         if (title.tmdb_id === null) content.append(link('Match title metadata', `/log-watch?resolve=${id}`, 'small d-inline-block mt-3'));
         else {
@@ -277,13 +350,6 @@
                 const scope = entry.season === null ? 'Overall show' : `Season ${entry.season}`;
                 if (seen.has(scope)) continue; seen.add(scope);
                 content.append(el('p', `${scope} · ${entry.progress.replaceAll('_', ' ')}`));
-            }
-        }
-        if (title.seasonAssessments?.length) {
-            content.append(el('h2', 'Season reactions', 'mt-4'));
-            for (const entry of title.seasonAssessments) {
-                content.append(el('p', `Season ${entry.season} · ${entry.reaction || 'No current reaction'}`));
-                if (entry.note) content.append(el('p', entry.note, 'text-body-secondary preserve-lines small'));
             }
         }
         const credits = el('section', undefined, 'title-credits');
@@ -303,7 +369,7 @@
             const history = await api('history', {id, offset: nextHistory});
             for (const event of history.items) {
                 const row = el('article', undefined, 'history-event');
-                const label = {historical_evidence: 'Historical viewing evidence', viewing: 'Logged viewing', assessment: 'Assessment updated', progress: 'Progress updated'}[event.kind] || event.kind;
+                const label = {historical_evidence: 'Watched', viewing: 'Watched', assessment: 'Reaction updated', progress: 'Progress updated'}[event.kind] || event.kind;
                 row.append(el('h3', `${label}${event.season !== null ? ' · Season ' + event.season : ''}`), el('p', `${['assessment', 'progress'].includes(event.kind) ? 'Recorded ' + event.recorded_at.slice(0,10) : event.watched_on || 'Unknown watch date'}${event.reaction ? ' · ' + event.reaction : ''}`, 'text-body-secondary mb-1'));
                 if (event.note) row.append(el('p', event.note, 'preserve-lines mb-0')); $('viewing-history').append(row);
             }
@@ -314,62 +380,21 @@
     }
 
     function seasonEditor() {
-        const dialog = $('season-dialog');
-        let title, requestId, pending = null, opening = 0;
-        function renderSeasons() {
-            const selected = $('season-number').value; $('season-number').replaceChildren();
-            for (const season of title.metadata.seasons || []) {
-                const assessment = title.seasonAssessments.find(item => item.season === season.season_number);
-                const name = season.name || `Season ${season.season_number}`;
-                $('season-number').append(new Option(name + (assessment ? ` · ${assessment.reaction || 'No assessment'}` : ''), String(season.season_number)));
-            }
-            const options = Array.from($('season-number').options);
-            $('season-number').value = options.some(option => option.value === selected) ? selected : (options.find(option => Number(option.value) > 0)?.value || options[0]?.value || '');
-        }
-        function loadSeason() {
-            const season = Number($('season-number').value);
-            const assessment = title.seasonAssessments.find(item => item.season === season);
-            const reaction = assessment?.reaction || '';
-            $('season-reaction').replaceChildren(new Option('No assessment', ''));
-            for (const word of new Set([...reactionWords, ...(reaction ? [reaction] : [])])) $('season-reaction').append(new Option(word, word));
-            $('season-reaction').value = reaction; $('season-note').value = assessment?.note || '';
-            $('season-status').textContent = ''; requestId = stableRequest();
-        }
-        $('season-close').onclick = () => dialog.close();
-        dialog.onclose = () => {opening++;};
-        $('season-number').onchange = loadSeason;
-        $('season-form').oninput = () => {if (!pending) requestId = stableRequest();};
-        $('season-form').onsubmit = async event => {
-            event.preventDefault(); if (!title || !$('season-number').value) return;
-            const button = $('season-save'); button.disabled = true; button.textContent = 'Saving…';
-            pending ||= [{action:'edit_assessment', titleId:title.id, season:Number($('season-number').value), reaction:$('season-reaction').value, note:$('season-note').value, date:null}];
-            $('season-fields').disabled = true; $('season-close').disabled = true; dialog.oncancel = e => e.preventDefault();
-            try {
-                await save(pending, requestId);
-                title = (await api('title', {id:title.id})).title;
-                const savedSeason = pending[0].season, committedRequest = requestId; pending = null; renderSeasons(); loadSeason(); requestId = committedRequest;
-                $('season-status').textContent = `Season ${savedSeason} saved. Your overall reaction is unchanged.`;
-                $('season-fields').disabled = false;
-            } catch (failure) {
-                $('season-status').textContent = failure.message + ' Retry Save for this exact season, or close and reopen to review again.';
-            } finally {button.disabled = false; button.textContent = 'Save reaction'; $('season-close').disabled = false; dialog.oncancel = null;}
-        };
+        const dialog = $('season-dialog'); let editor = null, opening = 0;
+        const close = () => {if (!editor?.busy() && (!editor?.dirty() || window.confirm('Discard unsaved reaction changes?'))) dialog.close();};
+        $('season-close').onclick = close;
+        dialog.oncancel = event => {event.preventDefault(); close();};
+        dialog.onclose = () => {opening++; editor?.destroy(); editor = null;};
         return async id => {
             if (dialog.open) return;
-            const current = ++opening; title = null; pending = null; requestId = stableRequest();
-            $('season-show').textContent = ''; $('season-overall').textContent = ''; $('season-number').replaceChildren();
-            $('season-fields').disabled = true; $('season-save').disabled = true; $('season-status').textContent = 'Loading seasons…'; dialog.showModal();
+            const current = ++opening; $('season-content').replaceChildren(el('p', 'Loading reactions…', 'text-body-secondary')); dialog.showModal();
             try {
-                const result = (await api('title', {id})).title;
+                const title = (await api('title', {id})).title;
                 if (current !== opening || !dialog.open) return;
-                if (result.media_type !== 'tv' || result.viewing_status !== 'seen') throw new Error('Save this show to your library before rating its seasons.');
-                title = result;
-                $('season-show').textContent = title.title;
-                $('season-overall').textContent = `Overall: ${title.reaction || 'No assessment'}. Each season is independent.`;
-                renderSeasons();
-                if (!$('season-number').options.length) throw new Error('Season details are unavailable. Refresh metadata from the title page and try again.');
-                loadSeason(); $('season-fields').disabled = false; $('season-save').disabled = false;
-            } catch (failure) {if (current === opening && dialog.open) $('season-status').textContent = failure.message;}
+                if (title.media_type !== 'tv' || title.viewing_status !== 'seen') throw new Error('Save this show to your library before rating its seasons.');
+                editor = reactionEditor(title, () => {}, busy => {$('season-close').disabled = busy;});
+                $('season-content').replaceChildren(el('p', title.title, 'fw-semibold'), editor.element);
+            } catch (failure) {if (current === opening && dialog.open) $('season-content').replaceChildren(el('p', failure.message));}
         };
     }
 

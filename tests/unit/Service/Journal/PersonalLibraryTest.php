@@ -121,6 +121,26 @@ class PersonalLibraryTest extends TestCase
         self::assertStringContainsString('Disliked', $this->library->export(1, 'csv'));
     }
 
+    public function testClearingOverallAssessmentPreservesSeasonReactionsAndViewingEvidence() : void
+    {
+        $id = $this->apply(['action' => 'confirm_seen', 'mediaType' => 'tv', 'tmdbId' => 42, 'reaction' => 'Liked', 'note' => 'Old note'])['titleIds'][0];
+        $this->apply(['action' => 'edit_assessment', 'titleId' => $id, 'season' => 1, 'reaction' => 'Loved', 'note' => 'First season only']);
+        $this->apply(['action' => 'edit_assessment', 'titleId' => $id, 'reaction' => 'Loved']);
+        self::assertSame('Old note', $this->library->title(1, $id)['title']['note']);
+        $this->apply(['action' => 'edit_assessment', 'titleId' => $id, 'reaction' => '', 'note' => '']);
+        $title = $this->library->title(1, $id)['title'];
+
+        self::assertSame('', $title['reaction']);
+        self::assertSame('', $title['note']);
+        self::assertSame('Loved', $title['seasonAssessments'][0]['reaction']);
+        self::assertSame('First season only', $title['seasonAssessments'][0]['note']);
+        self::assertSame('seen', $title['viewing_status']);
+        self::assertCount(1, array_filter($this->library->history(1, $id)['items'], static fn(array $event) : bool => $event['kind'] === 'historical_evidence'));
+        self::assertCount(0, array_filter($this->library->history(1, $id)['items'], static fn(array $event) : bool => $event['kind'] === 'viewing'));
+        $this->apply(['action' => 'edit_assessment', 'titleId' => $id, 'season' => 1, 'reaction' => '', 'note' => '']);
+        self::assertSame('', $this->library->title(1, $id)['title']['seasonAssessments'][0]['reaction']);
+    }
+
     public function testStaleProposalCannotCommitAndTransactionRollsBack() : void
     {
         $plan = $this->library->preview(1, [['action' => 'set_interest', 'mediaType' => 'movie', 'tmdbId' => 42, 'interest' => 'want']]);

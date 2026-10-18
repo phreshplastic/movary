@@ -423,3 +423,31 @@ main.container > div:has(> .nav-pills) .form-select { padding-inline-end: 2.25re
     .library-sheet { margin:auto 0 0; width:100%; max-width:100%; max-height:88dvh; border-radius:20px 20px 0 0; border-bottom:0; padding:1.3rem; padding-bottom:calc(1.3rem + env(safe-area-inset-bottom)); }
     .backfill-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
+
+/* Reactions are edited in place, with independent show and season rows. */
+.reaction-editor { clear:both; margin:1.75rem 0 1rem; scroll-margin-top:1.5rem; }
+.reaction-editor fieldset { min-width:0; }
+.reaction-table { width:100%; table-layout:fixed; border-collapse:collapse; }
+.reaction-table thead th { font-size:.75rem; font-weight:500; color:var(--bs-secondary-color); padding:.5rem 0; text-align:left; }
+.reaction-table th:first-child { width:24%; }
+.reaction-table th:nth-child(2) { width:32%; }
+.reaction-table tbody th { font-size:.9rem; font-weight:500; }
+.reaction-table tbody th,.reaction-table td { border-top:1px solid var(--bs-border-color); padding:.75rem .75rem .75rem 0; vertical-align:top; }
+.reaction-table td:last-child { padding-right:0; }
+.reaction-table .form-control,.reaction-table .form-select { font-size:.875rem; min-height:2.65rem; }
+.reaction-table textarea { resize:vertical; }
+.reaction-editor-footer { display:flex; align-items:center; gap:1rem; padding-top:.5rem; }
+.title-secondary-actions { margin-top:1.25rem; gap:1.25rem; }
+.title-secondary-actions a { text-decoration:none; }
+#season-dialog { width:min(760px, calc(100% - 2rem)); }
+#season-dialog .reaction-editor { margin-top:1rem; }
+@media (max-width:600px) {
+    .reaction-table,.reaction-table tbody { display:block; }
+    .reaction-table thead { display:none; }
+    .reaction-table tr { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.3fr); align-items:center; border-top:1px solid var(--bs-border-color); padding:.75rem 0; gap:.6rem; }
+    .reaction-table tbody th,.reaction-table td { border:0; padding:0; width:auto; }
+    .reaction-table th:first-child { width:auto; }
+    .reaction-table .reaction-note { grid-column:1/-1; }
+    .reaction-table .form-control,.reaction-table .form-select { font-size:1rem; min-height:2.75rem; }
+    .reaction-editor-footer { flex-wrap:wrap; }
+}
