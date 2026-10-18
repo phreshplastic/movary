@@ -316,7 +316,12 @@
     async function browseHistory() {
         const selected = new Map();
         const dialog = $('backfill-dialog');
-        let pageNumber = 1, nextPage = null, ticket = 0, pending = null, requestId = stableRequest();
+        const initialPage = Number(params.get('page'));
+        let pageNumber = Number.isInteger(initialPage) && initialPage >= 1 && initialPage <= 500 ? initialPage : 1;
+        let nextPage = null, ticket = 0, pending = null, requestId = stableRequest();
+        const browseFilters = $('backfill-filters');
+        if (['movie', 'tv'].includes(params.get('mediaType'))) browseFilters.elements.namedItem('mediaType').value = params.get('mediaType');
+        if (['top_rated', 'popular'].includes(params.get('list'))) browseFilters.elements.namedItem('list').value = params.get('list');
         function counter() {
             $('backfill-review').disabled = !selected.size || !!pending;
             $('backfill-review').textContent = selected.size ? `Review ${selected.size} selected` : 'Review selected';
@@ -347,9 +352,16 @@
                 card.append(label, reaction); $('backfill-grid').append(card);
             }
             $('backfill-status').textContent = 'TMDB catalog · 1,000+ votes per title. These lists help recall; they aren’t personalized recommendations.';
-            $('backfill-page').textContent = `Page ${pageNumber}`;
+            $('backfill-page').value = String(pageNumber);
+            const position = new URLSearchParams({...filters, page:String(pageNumber)});
+            history.replaceState(null, '', location.pathname + '?' + position);
             $('backfill-previous').disabled = pageNumber === 1; $('backfill-next').disabled = nextPage === null;
         }
+        $('backfill-jump').onsubmit = event => {
+            event.preventDefault();
+            if (!$('backfill-jump').reportValidity()) return;
+            pageNumber = Number($('backfill-page').value); run(load);
+        };
         $('backfill-filters').onsubmit = e => e.preventDefault();
         $('backfill-filters').onchange = () => {pageNumber = 1; run(load);};
         $('backfill-previous').onclick = () => {pageNumber = Math.max(1,pageNumber - 1); run(load);};
@@ -369,7 +381,7 @@
             pending ||= Array.from(selected.values(), title => ({action:'confirm_seen', mediaType:title.mediaType, tmdbId:title.tmdbId, reaction:title.reaction, note:title.existingNote || '', date:null}));
             // Freeze this reviewed batch for exact retries; closing after an error reloads authoritative state.
             $('backfill-close').disabled = true; dialog.oncancel = e => e.preventDefault();
-            for (const control of root.querySelectorAll('#backfill-grid input,#backfill-grid select,#backfill-filters select,#backfill-previous,#backfill-next')) control.disabled = true;
+            for (const control of root.querySelectorAll('#backfill-grid input,#backfill-grid select,#backfill-filters select,#backfill-jump input,#backfill-jump button,#backfill-previous,#backfill-next')) control.disabled = true;
             counter();
             try {
                 const receipt = await save(pending, requestId);
