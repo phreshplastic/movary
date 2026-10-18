@@ -616,6 +616,76 @@
           }
         }
       }
+    },
+    "/library-api/browse": {
+      "post": {
+        "summary": "Browse catalog for historical recall (read-only)",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mediaType": {
+                    "type": "string",
+                    "enum": [
+                      "movie",
+                      "tv"
+                    ],
+                    "default": "movie"
+                  },
+                  "list": {
+                    "type": "string",
+                    "enum": [
+                      "top_rated",
+                      "popular"
+                    ],
+                    "default": "top_rated"
+                  },
+                  "page": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500,
+                    "default": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Versioned personal-library result. Search and history use total, limit, offset, nextOffset, and items; title credits and taste have separate pagination. Preview returns exact changes, id, revision, and approval; commit returns the durable receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Sign-in required"
+          },
+          "400": {
+            "description": "Invalid, expired, stale, or temporarily unavailable operation; personal records are preserved"
+          },
+          "403": {
+            "description": "Invalid CSRF token"
+          }
+        }
+      }
     }
   },
   "components": {

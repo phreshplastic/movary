@@ -4,17 +4,19 @@
         {% if loggedIn %}
         <div class="library-navigation">
             <a href="{{ applicationUrl }}/library" {% if requestUrlPath == '/library' %}aria-current="page"{% endif %}>Library</a>
-            <a href="{{ applicationUrl }}/watchlist" {% if requestUrlPath == '/watchlist' %}aria-current="page"{% endif %}>Watchlist</a>
+            <a href="{{ applicationUrl }}/watchlist" {% if requestUrlPath == '/watchlist' %}aria-current="page"{% endif %}>Wishlist</a>
             <a href="{{ applicationUrl }}/taste" {% if requestUrlPath == '/taste' %}aria-current="page"{% endif %}>Taste</a>
         </div>
         {% endif %}
         <div class="app-nav-actions">
-            {% if loggedIn %}<a class="btn btn-primary" href="{{ applicationUrl }}/log-watch"><i class="bi bi-plus-lg" aria-hidden="true"></i> Log a watch</a>{% endif %}
+            {% if loggedIn %}<a class="btn btn-primary" href="{{ applicationUrl }}/log-watch"><i class="bi bi-plus-lg" aria-hidden="true"></i> Add</a>{% endif %}
             <div class="dropdown">
                 <button type="button" class="btn btn-outline-secondary nav-settings" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Settings"><i class="bi bi-gear" aria-hidden="true"></i></button>
                 <ul class="dropdown-menu dropdown-menu-end">
                     {% if loggedIn %}
                         <li><a class="dropdown-item" href="{{ applicationUrl }}/settings/account/general">Settings</a></li>
+                        <li><a class="dropdown-item" href="{{ applicationUrl }}/browse-history">Browse history</a></li>
+                        <li><a class="dropdown-item" href="{{ applicationUrl }}/watchlist?interest=not_interested">Not interested</a></li>
                         <li><a class="dropdown-item" href="{{ applicationUrl }}/import-history">Import history</a></li>
                         <li><a class="dropdown-item" href="{{ applicationUrl }}/journal/export/context">Export Markdown</a></li>
                         <li><a class="dropdown-item" href="{{ applicationUrl }}/journal/export/csv">Export CSV</a></li>

@@ -401,3 +401,25 @@ main.container > div:has(> .nav-pills) .form-select { padding-inline-end: 2.25re
     .credit-list { grid-template-columns:1fr; }
     .collection-tabs { flex-wrap:wrap; }
 }
+
+/* Readable context cards open a focused sheet, without disclosure triangles. */
+#taste-statements { display:grid; gap:1rem; max-width:850px; }
+.taste-card { display:block; width:100%; text-align:left; border:1px solid var(--bs-border-color); border-radius:14px; padding:1.3rem; color:var(--bs-body-color); background:var(--bs-body-bg); }
+.taste-card:hover { background:var(--bs-tertiary-bg); }
+.taste-card h2 { font-size:1.1rem; font-weight:600; margin-bottom:.6rem; }
+.taste-card p { line-height:1.6; margin-bottom:.75rem; }
+.library-sheet { width:min(680px,calc(100% - 2rem)); max-height:85dvh; border:1px solid var(--bs-border-color); border-radius:20px; padding:1.5rem; color:var(--bs-body-color); background:var(--bs-body-bg); overflow:auto; }
+.library-sheet::backdrop { background:rgba(0,0,0,.45); }
+.sheet-heading { position:sticky; top:0; background:var(--bs-body-bg); z-index:1; padding:.25rem 0 .75rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+.sheet-heading h2 { font-size:1.3rem; font-weight:650; margin:0; }
+.taste-reading p { line-height:1.7; }
+.taste-reading h3 { font-size:1.1rem; font-weight:600; margin:1.5rem 0 .8rem; }
+.library-sheet .taste-editor { border:0; padding:0; margin:0; background:none; }
+.backfill-card { min-width:0; }
+.backfill-card h2 { margin-bottom:.25rem; }
+.backfill-card .form-check { margin-top:.7rem; }
+.backfill-card .form-select { font-size:.8rem; padding-left:.5rem; }
+@media (max-width:767px) {
+    .library-sheet { margin:auto 0 0; width:100%; max-width:100%; max-height:88dvh; border-radius:20px 20px 0 0; border-bottom:0; padding:1.3rem; padding-bottom:calc(1.3rem + env(safe-area-inset-bottom)); }
+    .backfill-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}

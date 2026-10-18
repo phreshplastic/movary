@@ -61,7 +61,7 @@ class JournalController
      */
     private function executeLibrary(int $userId, string $action, array $input) : array
     {
-        $input += ['id' => '', 'creditsOffset' => 0, 'limit' => 25, 'offset' => 0, 'query' => '', 'mediaType' => 'all', 'page' => 1, 'changes' => [], 'requestId' => null, 'approval' => '', 'tasteOffset' => 0, 'fullStatements' => false, 'tmdbId' => 0];
+        $input += ['id' => '', 'creditsOffset' => 0, 'limit' => 25, 'offset' => 0, 'query' => '', 'mediaType' => 'all', 'page' => 1, 'changes' => [], 'requestId' => null, 'approval' => '', 'tasteOffset' => 0, 'fullStatements' => false, 'tmdbId' => 0, 'list' => 'top_rated'];
         if (in_array($action, ['preview', 'commit', 'refresh'], true)) {
             return $this->mutateLibrary($userId, $action, $input);
         }
@@ -72,6 +72,7 @@ class JournalController
             'title' => $this->library->title($userId, (string)$input['id'], (int)$input['creditsOffset']),
             'history' => $this->library->history($userId, (string)$input['id'], (int)$input['limit'], (int)$input['offset']),
             'catalog' => $this->library->catalog($userId, (string)$input['query'], (string)$input['mediaType'], (int)$input['page']),
+            'browse' => $this->library->browse($userId, (string)$input['mediaType'], (string)$input['list'], (int)$input['page']),
             'catalog-title' => ['metadata' => $this->library->catalogTitle((string)$input['mediaType'], (int)$input['tmdbId'])],
             default => throw new InvalidArgumentException('Unknown library operation.'),
         };

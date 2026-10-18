@@ -19,10 +19,10 @@ function addWebRoutes(RouterService $routerService, FastRoute\RouteCollector $ro
 
     $routes->add('GET', '/library', [Web\JournalController::class, 'library'], [Web\Middleware\UserIsAuthenticated::class]);
     $routes->add('GET', '/add-watched', [Web\JournalController::class, 'page'], [Web\Middleware\UserIsAuthenticated::class]);
-    $routes->add('GET', '/{screen:watchlist|taste|log-watch}', [Web\JournalController::class, 'page'], [Web\Middleware\UserIsAuthenticated::class]);
+    $routes->add('GET', '/{screen:watchlist|taste|log-watch|browse-history}', [Web\JournalController::class, 'page'], [Web\Middleware\UserIsAuthenticated::class]);
     $routes->add('GET', '/titles/{id:[a-f0-9]{32}}', [Web\JournalController::class, 'page'], [Web\Middleware\UserIsAuthenticated::class]);
     $routes->add('GET', '/import-history', [Web\JournalController::class, 'render'], [Web\Middleware\UserIsAuthenticated::class]);
-    $routes->add('POST', '/library-api/{action:context|search|facets|title|history|catalog|catalog-title|preview|commit|refresh}', [Web\JournalController::class, 'libraryAction'], [Web\Middleware\UserIsAuthenticated::class]);
+    $routes->add('POST', '/library-api/{action:context|search|facets|title|history|catalog|browse|catalog-title|preview|commit|refresh}', [Web\JournalController::class, 'libraryAction'], [Web\Middleware\UserIsAuthenticated::class]);
     $routes->add('GET', '/journal', [Web\JournalController::class, 'render'], [Web\Middleware\UserIsAuthenticated::class]);
     $routes->add('POST', '/journal/{action:preview|review|commit}', [Web\JournalController::class, 'action'], [Web\Middleware\UserIsAuthenticated::class]);
     $routes->add('GET', '/journal/export/{format:csv|context|json}', [Web\JournalController::class, 'export'], [Web\Middleware\UserIsAuthenticated::class]);

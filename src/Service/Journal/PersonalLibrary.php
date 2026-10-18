@@ -100,10 +100,25 @@ class PersonalLibrary
     /** @return array<string,mixed> */
     public function catalog(int $userId, string $query, string $type = 'all', int $page = 1) : array
     {
-        $result = $this->metadata->search($query, $type, $page);
+        return $this->catalogStates($userId, $this->metadata->search($query, $type, $page));
+    }
+
+    /** @return array<string,mixed> */
+    public function browse(int $userId, string $type = 'movie', string $list = 'top_rated', int $page = 1) : array
+    {
+        return $this->catalogStates($userId, $this->metadata->browse($type, $list, $page));
+    }
+
+    /** @param array<string,mixed> $result
+     * @return array<string,mixed>
+     */
+    private function catalogStates(int $userId, array $result) : array
+    {
         foreach ($result['items'] as &$item) {
             $existing = $this->repository->identity($userId, $item['mediaType'], $item['tmdbId']);
             $item['localId'] = $existing['id'] ?? null;
+            $item['existingNote'] = $existing['note'] ?? '';
+            $item['existingReaction'] = $existing['reaction'] ?? '';
             $item['viewingStatus'] = $existing['viewing_status'] ?? 'unknown';
         }
 

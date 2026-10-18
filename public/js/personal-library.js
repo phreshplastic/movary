@@ -9,7 +9,8 @@
     const params = new URLSearchParams(location.search);
     const statusLabel = value => ({seen: 'Watched', unseen: 'Not watched', unknown: 'Unknown'})[value] || value;
     const languageLabel = code => { try {return new Intl.DisplayNames([navigator.language], {type:'language'}).of(code);} catch {return code;} };
-    const kindLabel = value => ({explicit: 'Your preference', approved_insight: 'Approved model interpretation', imported_context: 'Imported context · original attribution preserved'})[value] || value;
+    const reactionWords = ['Loved', 'Liked', 'Okay', 'Disliked', 'Strongly disliked'];
+    const kindLabel = value => ({explicit: 'Your preference', approved_insight: 'Approved model interpretation', imported_context: 'Imported background · original wording preserved'})[value] || value;
     const el = (tag, text, className) => {
         const node = document.createElement(tag);
         if (text !== undefined && text !== null) node.textContent = text;
@@ -57,7 +58,13 @@
 
     async function collection() {
         const form = $('collection-filters');
-        let interest = page === 'watchlist' ? 'want' : '';
+        const interest = page === 'watchlist' ? (params.get('interest') === 'not_interested' ? 'not_interested' : 'want') : '';
+        if (interest === 'not_interested') {
+            document.title = 'Not interested | Movies & TV';
+            $('collection-heading').textContent = 'Not interested';
+            $('collection-description').textContent = 'Titles you don’t want suggested. This doesn’t change whether you’ve watched them.';
+            $('interest-alternate').textContent = 'Back to wishlist'; $('interest-alternate').href = base + '/watchlist';
+        }
         let offset = 0, total = 0, sequence = 0;
         let view = localStorage.getItem('personalLibraryView') || 'grid';
         function setView(value) {
@@ -73,6 +80,7 @@
             const control = form.elements.namedItem(name);
             if (control) control.value = value;
         }
+        form.elements.namedItem('status').value = page === 'library' ? 'seen' : 'all';
         if (params.has('genre') || params.has('person')) { $('collection-extra').hidden = false; $('more-filters').setAttribute('aria-expanded', 'true'); }
         $('more-filters').onclick = () => {
             $('collection-extra').hidden = !$('collection-extra').hidden;
@@ -89,12 +97,13 @@
             }
             if (params.has(kind)) select.value = params.get(kind);
         }
-        const reactions = [...new Set(['Loved', 'Liked', 'Enjoyed', 'Just okay', 'Disliked', ...facets.items.filter(x => x.kind === 'reaction').map(x => x.label)])];
+        const reactions = [...new Set([...reactionWords, ...facets.items.filter(x => x.kind === 'reaction').map(x => x.label)])];
         reactions.forEach(word => form.elements.namedItem('reaction').append(new Option(word, word)));
         if (params.has('reaction')) form.elements.namedItem('reaction').value = params.get('reaction');
         async function load() {
             const ticket = ++sequence;
             const filters = Object.fromEntries(new FormData(form));
+            filters.status = page === 'library' ? 'seen' : 'all';
             if (interest) filters.interest = interest;
             const result = await api('search', {...filters, offset, limit: 25});
             if (ticket !== sequence) return;
@@ -104,11 +113,11 @@
                 const detailPath = `/titles/${title.id}`;
                 const card = link('', detailPath, 'poster-card');
                 card.append(poster(title.metadata.poster, title.title, 'poster-cover'), el('div', title.title, 'poster-name'), el('div', `${title.release_year || 'Year unknown'} · ${title.media_type === 'tv' ? 'TV' : 'Movie'}`, 'poster-year text-body-secondary'));
-                card.append(el('div', title.reaction || statusLabel(title.viewing_status), 'poster-reaction'));
+                card.append(el('div', title.reaction || (page === 'library' ? 'No reaction yet' : ''), 'poster-reaction'));
                 $('collection-grid').append(card);
                 const row = el('tr');
                 const nameCell = el('td'); nameCell.append(link(title.title, detailPath, 'library-title'), el('span', title.release_year, 'text-body-secondary ms-2'));
-                row.append(nameCell, el('td', title.media_type === 'tv' ? 'TV' : 'Movie'), el('td', title.reaction || '—'), el('td', collectNames(title.metadata.genres) || '—', 'text-body-secondary'), el('td', statusLabel(title.viewing_status), 'text-body-secondary'));
+                row.append(nameCell, el('td', title.media_type === 'tv' ? 'TV' : 'Movie'), el('td', title.reaction || '—'), el('td', collectNames(title.metadata.genres) || '—', 'text-body-secondary'));
                 $('collection-table').querySelector('tbody').append(row);
             }
             $('collection-count').textContent = `${total} ${total === 1 ? 'title' : 'titles'}`;
@@ -117,7 +126,7 @@
             $('page-previous').disabled = offset === 0; $('page-next').disabled = result.nextOffset === null;
             $('page-label').textContent = total ? `${offset + 1}–${Math.min(total, offset + 25)} of ${total}` : '';
             const query = new URLSearchParams();
-            for (const [key, value] of Object.entries(filters)) if (value && value !== 'all' && key !== 'interest') query.set(key, value);
+            for (const [key, value] of Object.entries(filters)) if (value && value !== 'all' && key !== 'status') query.set(key, value);
             history.replaceState(null, '', location.pathname + (query.size ? '?' + query : ''));
         }
         let timer;
@@ -126,10 +135,6 @@
         form.addEventListener('change', () => {clearTimeout(timer); offset = 0; run(load);});
         form.addEventListener('reset', () => setTimeout(() => {offset = 0; run(load);}, 0));
         $('page-next').onclick = () => {offset += 25; run(load);}; $('page-previous').onclick = () => {offset = Math.max(0, offset - 25); run(load);};
-        document.querySelectorAll('[data-interest]').forEach(button => button.onclick = () => {
-            interest = button.dataset.interest; offset = 0;
-            document.querySelectorAll('[data-interest]').forEach(b => b.classList.toggle('active', b === button)); run(load);
-        });
         await load();
     }
 
@@ -242,12 +247,12 @@
         const content = el('div', undefined, 'title-content');
         content.append(el('h1', title.title), el('p', `${title.release_year || 'Year unknown'} · ${title.media_type === 'tv' ? 'TV show' : 'Movie'}${metadata.language ? ' · ' + languageLabel(metadata.language) : ''}${metadata.runtime && !Array.isArray(metadata.runtime) ? ' · ' + metadata.runtime + ' min' : ''}`, 'text-body-secondary'));
         const tags = el('div', undefined, 'metadata-links');
-        for (const genre of metadata.genres || []) tags.append(link(genre.name, `/library?status=all&genre=${encodeURIComponent(genre.id)}`, 'btn btn-outline-secondary btn-sm'));
+        for (const genre of metadata.genres || []) tags.append(link(genre.name, `/library?genre=${encodeURIComponent(genre.id)}`, 'btn btn-outline-secondary btn-sm'));
         content.append(tags);
         if (metadata.filmmakers?.length) {
             const makers = el('p', undefined, 'filmmaker-links small mt-3');
             makers.append(el('span', title.media_type === 'tv' ? 'Created by ' : 'Directed by ', 'text-body-secondary'));
-            metadata.filmmakers.forEach((person, index) => {if (index) makers.append(el('span', ', ')); makers.append(link(person.name, `/library?status=all&person=${encodeURIComponent(person.id)}`));});
+            metadata.filmmakers.forEach((person, index) => {if (index) makers.append(el('span', ', ')); makers.append(link(person.name, `/library?person=${encodeURIComponent(person.id)}`));});
             content.append(makers);
         }
         if (metadata.overview) content.append(el('p', metadata.overview, 'title-overview'));
@@ -255,9 +260,9 @@
         if (title.note) assessment.append(el('p', title.note, 'preserve-lines'));
         content.append(assessment);
         const actions = el('div', undefined, 'title-actions');
-        actions.append(link(title.viewing_status === 'seen' ? 'Log another watch' : 'Log a watch', `/log-watch?title=${id}`, 'btn btn-primary'));
+        actions.append(link(title.viewing_status === 'seen' ? 'Add another viewing' : 'Mark as watched', `/log-watch?title=${id}`, 'btn btn-primary'));
         if (title.viewing_status === 'seen') actions.append(link('Edit reaction', `/log-watch?title=${id}&action=edit_assessment`, 'btn btn-outline-secondary'));
-        actions.append(link(title.interest === 'want' ? 'Want to watch' : title.interest === 'not_interested' ? 'Not interested' : 'Watchlist preference', `/log-watch?title=${id}&action=set_interest`, 'btn btn-outline-secondary'));
+        actions.append(link(title.interest === 'want' ? 'On wishlist' : title.interest === 'not_interested' ? 'Not interested' : 'Save to a list', `/log-watch?title=${id}&action=set_interest`, 'btn btn-outline-secondary'));
         content.append(actions);
         if (title.tmdb_id === null) content.append(link('Match title metadata', `/log-watch?resolve=${id}`, 'small d-inline-block mt-3'));
         else {
@@ -281,14 +286,16 @@
                 if (entry.note) content.append(el('p', entry.note, 'text-body-secondary preserve-lines small'));
             }
         }
-        const credits = el('details', undefined, 'title-credits'); credits.append(el('summary', 'People & credits'));
-        const people = el('div', undefined, 'credit-list');
-        function addPeople(items) {for (const person of items) {const row = el('div'); row.append(link(person.name, `/library?status=all&person=${encodeURIComponent(person.id)}`), el('span', `${person.role}${person.scope === 'aggregate' ? ' · across episodes' : ''}`, 'small text-body-secondary')); people.append(row);}}
+        const credits = el('section', undefined, 'title-credits');
+        const creditsToggle = el('button', 'Show people & credits', 'btn btn-outline-secondary btn-sm'); creditsToggle.type = 'button'; creditsToggle.setAttribute('aria-expanded', 'false'); credits.append(creditsToggle);
+        const people = el('div', undefined, 'credit-list mt-3'); people.hidden = true;
+        creditsToggle.onclick = () => {people.hidden = !people.hidden; creditsToggle.textContent = people.hidden ? 'Show people & credits' : 'Hide people & credits'; creditsToggle.setAttribute('aria-expanded', String(!people.hidden));};
+        function addPeople(items) {for (const person of items) {const row = el('div'); row.append(link(person.name, `/library?person=${encodeURIComponent(person.id)}`), el('span', `${person.role}${person.scope === 'aggregate' ? ' · across episodes' : ''}`, 'small text-body-secondary')); people.append(row);}}
         addPeople(metadata.people || []); credits.append(people);
         let nextCredits = title.credits.nextOffset;
         if (nextCredits !== null) {
             const more = el('button', 'More credits', 'btn btn-outline-secondary btn-sm mt-3');
-            more.onclick = () => run(async () => {const next = (await api('title', {id, creditsOffset: nextCredits})).title; addPeople(next.metadata.people); nextCredits = next.credits.nextOffset; more.hidden = nextCredits === null;}); credits.append(more);
+            more.onclick = () => run(async () => {const next = (await api('title', {id, creditsOffset: nextCredits})).title; addPeople(next.metadata.people); nextCredits = next.credits.nextOffset; more.hidden = nextCredits === null;}); people.append(more);
         }
         content.append(credits); detail.append(content);
         let nextHistory = 0;
@@ -306,6 +313,79 @@
         $('history-more').onclick = () => run(loadHistory); await loadHistory();
     }
 
+    async function browseHistory() {
+        const selected = new Map();
+        const dialog = $('backfill-dialog');
+        let pageNumber = 1, nextPage = null, ticket = 0, pending = null, requestId = stableRequest();
+        function counter() {
+            $('backfill-review').disabled = !selected.size || !!pending;
+            $('backfill-review').textContent = selected.size ? `Review ${selected.size} selected` : 'Review selected';
+        }
+        function key(title) {return `${title.mediaType}:${title.tmdbId}`;}
+        async function load() {
+            const current = ++ticket;
+            $('backfill-status').textContent = 'Loading titles…';
+            const filters = Object.fromEntries(new FormData($('backfill-filters')));
+            const result = await api('browse', {...filters, page:pageNumber});
+            if (current !== ticket) return;
+            nextPage = result.nextPage;
+            $('backfill-grid').replaceChildren();
+            for (const title of result.items) {
+                const card = el('article', undefined, 'backfill-card');
+                card.append(poster(title.poster, title.title, 'poster-cover'), el('h2', title.title, 'poster-name'), el('p', title.year || 'Year unknown', 'poster-year text-body-secondary'));
+                if (title.viewingStatus === 'seen') {
+                    card.append(link('Already in library', `/titles/${title.localId}`, 'small')); $('backfill-grid').append(card); continue;
+                }
+                const label = el('label', undefined, 'form-check'); const check = el('input', undefined, 'form-check-input'); check.type = 'checkbox';
+                check.checked = selected.has(key(title)); label.append(check, el('span', 'Watched', 'form-check-label'));
+                const reaction = el('select', undefined, 'form-select form-select-sm mt-2'); reaction.setAttribute('aria-label', `Reaction to ${title.title}`);
+                reaction.append(new Option('No reaction yet', '')); reactionWords.forEach(word => reaction.append(new Option(word, word)));
+                if (title.existingReaction && !reactionWords.includes(title.existingReaction)) reaction.append(new Option(title.existingReaction, title.existingReaction));
+                reaction.value = selected.get(key(title))?.reaction ?? title.existingReaction ?? ''; reaction.disabled = !check.checked;
+                check.onchange = () => {if (check.checked && selected.size >= 100) {check.checked = false; error('Save this batch before selecting more than 100 titles.'); return;} reaction.disabled = !check.checked; if (check.checked) selected.set(key(title), {...title, reaction:reaction.value}); else selected.delete(key(title)); counter();};
+                reaction.onchange = () => {if (check.checked) selected.set(key(title), {...title, reaction:reaction.value});};
+                card.append(label, reaction); $('backfill-grid').append(card);
+            }
+            $('backfill-status').textContent = 'TMDB catalog · 1,000+ votes per title. These lists help recall; they aren’t personalized recommendations.';
+            $('backfill-page').textContent = `Page ${pageNumber}`;
+            $('backfill-previous').disabled = pageNumber === 1; $('backfill-next').disabled = nextPage === null;
+        }
+        $('backfill-filters').onsubmit = e => e.preventDefault();
+        $('backfill-filters').onchange = () => {pageNumber = 1; run(load);};
+        $('backfill-previous').onclick = () => {pageNumber = Math.max(1,pageNumber - 1); run(load);};
+        $('backfill-next').onclick = () => {pageNumber = nextPage || pageNumber; run(load);};
+        $('backfill-review').onclick = () => {
+            $('backfill-changes').replaceChildren(); $('backfill-receipt').textContent = '';
+            for (const title of selected.values()) $('backfill-changes').append(el('p', `${title.title} (${title.year || 'Year unknown'}) · Watched · ${title.reaction || 'No reaction'} · Unknown date`));
+            requestId = stableRequest(); dialog.showModal();
+        };
+        function closeBatch() {
+            if (pending) {selected.clear(); pending = null; location.reload();}
+            else dialog.close();
+        }
+        $('backfill-close').onclick = closeBatch;
+        $('backfill-save').onclick = async () => {
+            const button = $('backfill-save'); button.disabled = true; button.textContent = 'Saving…';
+            pending ||= Array.from(selected.values(), title => ({action:'confirm_seen', mediaType:title.mediaType, tmdbId:title.tmdbId, reaction:title.reaction, note:title.existingNote || '', date:null}));
+            // Freeze this reviewed batch for exact retries; closing after an error reloads authoritative state.
+            $('backfill-close').disabled = true; dialog.oncancel = e => e.preventDefault();
+            for (const control of root.querySelectorAll('#backfill-grid input,#backfill-grid select,#backfill-filters select,#backfill-previous,#backfill-next')) control.disabled = true;
+            counter();
+            try {
+                const receipt = await save(pending, requestId);
+                $('backfill-receipt').textContent = `Saved ${receipt.titleIds.length} titles. Dates remain unknown.`;
+                selected.clear(); pending = null; button.hidden = true;
+                $('backfill-close').disabled = false; dialog.oncancel = null;
+                dialog.onclose = () => location.reload();
+            } catch (failure) {
+                $('backfill-receipt').textContent = failure.message + ' Retry Save selected for this exact batch, or close to reload your saved history.';
+                $('backfill-close').disabled = false; dialog.oncancel = event => {event.preventDefault(); closeBatch();};
+            } finally {button.disabled = false; button.textContent = 'Save selected';}
+        };
+        window.addEventListener('beforeunload', event => {if (selected.size || pending) {event.preventDefault(); event.returnValue = '';}});
+        await load();
+    }
+
     async function tastePage() {
         let requestId = stableRequest(), pendingTaste = null;
         const [context, titles] = await Promise.all([api('context', {fullStatements:true}), api('search', {status: 'seen', limit: 100})]);
@@ -319,26 +399,40 @@
         }
         for (const title of titles.items) $('taste-evidence').append(new Option(`${title.title} (${title.release_year})`, title.id));
         function edit(statement = null) {
-            requestId = stableRequest(); pendingTaste = null; $('taste-form').hidden = false;
+            requestId = stableRequest(); pendingTaste = null; $('taste-edit-dialog').showModal();
             for (const control of $('taste-form').querySelectorAll('input,textarea,select')) control.disabled = false;
             $('taste-id').value = statement?.id || ''; $('taste-statement').value = statement?.statement || '';
             $('taste-kind').value = statement?.kind || 'explicit'; $('taste-kind').querySelector('[value="imported_context"]').hidden = statement?.kind !== 'imported_context';
             for (const option of $('taste-evidence').options) option.selected = (statement?.evidence || []).includes(option.value);
             $('taste-editor-title').textContent = statement ? 'Edit statement' : 'Add a preference'; $('taste-statement').focus();
         }
-        for (const statement of context.taste) {
-            const card = el('article', undefined, 'taste-statement'); const header = el('div', undefined, 'taste-statement-heading');
-            const editButton = el('button', 'Edit', 'btn btn-link btn-sm'); editButton.onclick = () => edit(statement);
-            header.append(el('h2', kindLabel(statement.kind)), editButton); card.append(header);
-            if (statement.kind === 'imported_context') {
-                const original = el('details'); original.append(el('summary', statement.provenance?.source || 'Original context'), el('p', statement.statement, 'preserve-lines mt-3')); card.append(original);
-            } else card.append(el('p', statement.statement, 'preserve-lines'));
-            const sources = el('div', undefined, 'metadata-links');
-            for (const id of statement.evidence) sources.append(link(titles.items.find(t => t.id === id)?.title || 'Supporting watch', `/titles/${id}`, 'small'));
-            if (statement.provenance?.source) sources.append(el('span', `Source: ${statement.provenance.source}`, 'small text-body-secondary'));
-            card.append(sources); $('taste-statements').append(card);
+        const reading = $('taste-read-dialog');
+        const readableText = text => text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1').replace(/\*([^*\n]+)\*/g, '$1');
+        const cleanText = text => readableText(text).replace(/\r/g, '').replace(/\n[ \t]*\n(?:[ \t]*\n)+/g, '\n\n').trim();
+        function read(statement, name) {
+            $('taste-read-title').textContent = name;
+            $('taste-read-source').textContent = kindLabel(statement.kind);
+            $('taste-read-body').replaceChildren();
+            for (const block of cleanText(statement.statement).replace(/^# [^\n]+\n*/, '').split(/\n\n/)) {
+                if (/^#{1,3} /.test(block) && !block.includes('\n')) $('taste-read-body').append(el('h3', block.replace(/^#+ /, '')));
+                else $('taste-read-body').append(el('p', block, 'preserve-lines'));
+            }
+            const evidence = el('div', undefined, 'metadata-links');
+            for (const id of statement.evidence) evidence.append(link(titles.items.find(title => title.id === id)?.title || 'Supporting watch', `/titles/${id}`, 'small'));
+            $('taste-read-body').append(evidence);
+            $('edit-open-taste').onclick = () => {reading.close(); edit(statement);}; reading.showModal();
         }
-        $('add-taste').onclick = () => edit(); $('cancel-taste').onclick = () => {$('taste-form').hidden = true;};
+        context.taste.sort((a, b) => Number((a.provenance?.source || '').includes('WATCH_HISTORY')) - Number((b.provenance?.source || '').includes('WATCH_HISTORY')));
+        for (const statement of context.taste) {
+            const source = statement.provenance?.source || '';
+            const name = statement.kind === 'imported_context' ? (source.includes('TASTE_PROFILE') ? 'Taste profile' : 'History notes') : kindLabel(statement.kind);
+            const card = el('button', undefined, 'taste-card'); card.type = 'button';
+            const preview = name === 'History notes' ? 'Background notes from the original history import, kept for reference.' : cleanText(statement.statement).split('\n').filter(line => line.trim() && !line.startsWith('#')).join(' ').slice(0, 180);
+            card.append(el('h2', name), el('p', preview + (preview.length === 180 ? '…' : ''), 'text-body-secondary'), el('span', statement.kind === 'imported_context' ? 'Saved background · Read & edit' : 'Read & edit', 'small text-body-secondary'));
+            card.onclick = () => read(statement, name); $('taste-statements').append(card);
+        }
+        $('close-taste').onclick = () => reading.close();
+        $('add-taste').onclick = () => edit(); $('cancel-taste').onclick = () => {$('taste-edit-dialog').close();};
         $('taste-form').onsubmit = async event => {
             event.preventDefault(); const button = $('taste-form').querySelector('[type="submit"],button:not([type])'); button.disabled = true;
             const change = {action: 'save_taste', kind: $('taste-kind').value, statement: $('taste-statement').value, evidence: Array.from($('taste-evidence').selectedOptions, x => x.value)};
@@ -348,5 +442,5 @@
             try {await save(pendingTaste, requestId); location.reload();} catch (failure) {error(failure.message + ' Retry Save for this exact statement, or cancel and reopen the editor for a fresh review.');} finally {button.disabled = false;}
         };
     }
-    run(() => page === 'library' || page === 'watchlist' ? collection() : page === 'log-watch' ? quickLog() : page === 'title' ? titlePage() : tastePage());
+    run(() => page === 'library' || page === 'watchlist' ? collection() : page === 'log-watch' ? quickLog() : page === 'title' ? titlePage() : page === 'browse-history' ? browseHistory() : tastePage());
 })();

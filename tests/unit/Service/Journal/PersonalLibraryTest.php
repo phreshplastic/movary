@@ -38,6 +38,25 @@ class PersonalLibraryTest extends TestCase
         $this->library = new PersonalLibrary($this->repository, $metadata, $this->createStub(\Movary\Service\Journal\LibraryCheckpoint::class));
     }
 
+    public function testCatalogBrowsingReadsOwnerScopedStatesWithoutCreatingEvidence() : void
+    {
+        $receipt = $this->apply(['action' => 'confirm_seen', 'mediaType' => 'movie', 'tmdbId' => 42, 'reaction' => 'Enjoyed', 'note' => 'Original note']);
+        $metadata = $this->createStub(LibraryMetadata::class);
+        $metadata->method('browse')->willReturn(['items' => [
+            ['mediaType' => 'movie', 'tmdbId' => 42], ['mediaType' => 'tv', 'tmdbId' => 42],
+        ]]);
+        $library = new PersonalLibrary($this->repository, $metadata, $this->createStub(\Movary\Service\Journal\LibraryCheckpoint::class));
+        $revision = $this->repository->revision(1);
+        $result = $library->browse(1);
+        self::assertSame(['seen', 'unknown'], array_column($result['items'], 'viewingStatus'));
+        self::assertSame($receipt['titleIds'][0], $result['items'][0]['localId']);
+        self::assertSame('Original note', $result['items'][0]['existingNote']);
+        self::assertSame('Enjoyed', $result['items'][0]['existingReaction']);
+        self::assertSame(['unknown', 'unknown'], array_column($library->browse(2)['items'], 'viewingStatus'));
+        self::assertSame($revision, $this->repository->revision(1));
+        self::assertSame(1, (int)$this->repository->db->fetchOne('SELECT COUNT(*) FROM journal_event'));
+    }
+
     public function testInterestDoesNotCreateViewingAndMovieTvIdsCannotCollide() : void
     {
         $first = $this->apply(['action' => 'set_interest', 'mediaType' => 'movie', 'tmdbId' => 42, 'interest' => 'want']);

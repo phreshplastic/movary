@@ -28,6 +28,26 @@ class LibraryMetadataTest extends TestCase
         self::assertSame('2020', $metadata['year']);
     }
 
+    public function testBrowsingIsBoundedAndReturnsUnknownCatalogCandidates() : void
+    {
+        $client = $this->createMock(TmdbClient::class);
+        $client->expects(self::once())->method('get')->with('/discover/movie', [
+            'page' => '500', 'include_adult' => 'false', 'sort_by' => 'vote_average.desc', 'vote_count.gte' => '1000',
+        ])->willReturn(['total_pages' => 900, 'results' => [['id' => 42, 'title' => 'Fixture', 'release_date' => '1995-01-01']]]);
+        $result = (new LibraryMetadata($client, $this->createStub(ImageUrlService::class)))->browse('movie', 'top_rated', 500);
+        self::assertNull($result['nextPage']);
+        self::assertSame('unknown', $result['items'][0]['viewingStatus']);
+        self::assertSame(42, $result['items'][0]['tmdbId']);
+    }
+
+    public function testBrowsingRejectsUnrecognizedListsBeforeContactingProvider() : void
+    {
+        $client = $this->createMock(TmdbClient::class);
+        $client->expects(self::never())->method('get');
+        $this->expectException(\InvalidArgumentException::class);
+        (new LibraryMetadata($client, $this->createStub(ImageUrlService::class)))->browse('tv', '../private');
+    }
+
     public function testProviderOutagesReturnNoSensitiveExceptionDetails() : void
     {
         $client = $this->createStub(TmdbClient::class);

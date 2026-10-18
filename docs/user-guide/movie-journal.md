@@ -4,13 +4,21 @@ This fork adds a single-person library for maintaining trustworthy context used 
 
 ## Everyday use
 
-Library opens as a poster grid with a remembered table alternative. Both views use the same search, sort, status, type, reaction, genre, person, language, and year filters. Title pages show metadata, the current personal assessment, notes, scoped TV progress, and paginated viewing evidence. Genre and person links open filtered collections. Missing metadata leaves titles visible.
+Library opens as a poster grid with a remembered table alternative. Library contains confirmed watched titles only. Both views use the same search, sort, type, reaction, genre, person, language, and year filters; viewing status remains available to MCP without becoming a browsing control. Title pages show metadata, the current personal assessment, notes, scoped TV progress, and paginated viewing evidence. Genre and person links open filtered collections. Missing metadata leaves titles visible.
 
-Log a watch searches movies and TV by title, shows poster/year matches, and saves the reviewed form. Today is the editable default; Unknown is explicit. Qualitative reactions support preset shortcuts and free text, without numeric ratings. Existing titles distinguish another viewing from editing an assessment. TV can use overall-show or season scope; a season response cannot replace the show assessment.
+Add searches movies and TV by title, shows poster/year matches, and saves the reviewed form. Today is the editable default; Unknown is explicit. Reaction shortcuts are Loved, Liked, Okay, Disliked, and Strongly disliked, with free text still supported. Existing reaction words are preserved exactly; no numeric conversion is performed. Existing titles distinguish another viewing from editing an assessment. TV can use overall-show or season scope; a season response cannot replace the show assessment.
 
-Watchlist preferences (Want to watch / Not interested) are independent of viewing evidence. Taste separates explicit statements, approved model interpretations with supporting title IDs, and attributed imported context. Model proposals require approval; frequency is not treated as preference.
+Wishlist contains explicitly saved Want to watch titles. Not interested is a separate view reachable from Settings and Wishlist. Both preferences are independent of viewing evidence; merely being unseen or recommended does not add a title to Wishlist. Taste opens readable cards in a modal sheet (a bottom sheet on mobile), separating explicit statements, approved model interpretations with supporting title IDs, and attributed imported context. Whitespace is normalized only for display; originals remain intact. Model proposals require approval; frequency is not treated as preference.
 
 Import history retains batch recall with unknown dates by default, ambiguous matches shown for review, and exact previews before commit. Native Movary personal writers and integrations are read-only for migrated owners so they cannot maintain a competing record.
+
+## Browse history
+
+Add → Browse history (also in Settings) displays paginated movie or TV posters from TMDB Discover, sorted by average rating or popularity and limited to titles with at least 1,000 provider votes. These are recall aids, not personalized recommendations. Mark Watched and optionally choose a reaction; already-confirmed titles link to the library. Selections survive paging and list/type changes within the page, with an unsaved-change warning on navigation. Review up to 100 selected identities and their reactions before Save selected. Dates remain unknown, series completion is not inferred, and skipped cards create no record. Existing notes are preserved.
+
+Catalog reads do not change personal records. Saving uses the existing confirm_seen service, exact preview/commit tokens, revision checks, checkpoints, and retry receipts. A successful batch clears its temporary selection. Provider list ordering can change; the page number is not a permanent resume bookmark. External CSV exports remain supported through reviewed reconciliation rather than the blocked legacy native importer.
+
+Provider references: [Discover movies](https://developer.themoviedb.org/reference/discover-movie) and [Discover TV](https://developer.themoviedb.org/reference/discover-tv).
 
 ## Data and migration
 

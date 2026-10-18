@@ -50,6 +50,30 @@ class LibraryMetadata
             'provenance' => ['source' => 'TMDB', 'fetchedAt' => gmdate('c')], 'warning' => 'Catalog matches are not viewing evidence.'];
     }
 
+    /** @return array<string,mixed> */
+    public function browse(string $type = 'movie', string $list = 'top_rated', int $page = 1) : array
+    {
+        $this->type($type);
+        if (in_array($list, ['top_rated', 'popular'], true) === false || $page < 1 || $page > 500) {
+            throw new InvalidArgumentException('Choose a catalog list and page between 1 and 500.');
+        }
+        $filters = ['page' => (string)$page, 'include_adult' => 'false',
+            'sort_by' => $list === 'top_rated' ? 'vote_average.desc' : 'popularity.desc', 'vote_count.gte' => '1000'];
+        try {
+            $result = $this->client->get('/discover/' . $type, $filters);
+            $items = [];
+            foreach ($result['results'] ?? [] as $row) {
+                $items[] = $this->candidate($row, $type);
+            }
+        } catch (Throwable) {
+            throw new InvalidArgumentException('Catalog browsing is temporarily unavailable. Your library has not changed.');
+        }
+
+        return ['contractVersion' => '1.0', 'items' => $items, 'page' => $page,
+            'nextPage' => $page < min(500, (int)($result['total_pages'] ?? 0)) ? $page + 1 : null,
+            'provenance' => ['source' => 'TMDB', 'fetchedAt' => gmdate('c')], 'warning' => 'Catalog results are not viewing evidence.'];
+    }
+
     /** @param array<string,mixed> $row
      * @return array<string,mixed>
      */
