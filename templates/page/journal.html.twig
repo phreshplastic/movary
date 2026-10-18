@@ -1,37 +1,79 @@
 {% extends 'base.html.twig' %}
-{% block title %}Your movie journal{% endblock %}
-{% block stylesheets %}<link rel="stylesheet" href="{{ asset_url('css/journal.css') }}">{% endblock %}
-{% block scripts %}<script src="{{ asset_url('js/journal.js') }}"></script>{% endblock %}
+
+{% block title %}Journal{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="{{ asset_url('css/journal.css') }}">
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ asset_url('js/journal.js') }}"></script>
+{% endblock %}
+
 {% block body %}
-{{ include('component/navbar.html.twig') }}
-<main class="journal-shell">
-    <header class="journal-heading">
-        <div><p class="journal-eyebrow">A record of your movie life</p><h1>Your movie journal<span>.</span></h1>
-        <p class="journal-intro">Remember a few more? Paste them in. Keep the dates you know and the reactions you actually felt.</p></div>
-        <span class="journal-private"><i class="bi bi-lock"></i> Private to you</span>
-    </header>
-    <div class="journal-layout">
-        <section class="journal-card" aria-labelledby="intake-title">
-            <div class="journal-card-heading"><span class="journal-step" id="step-number">01</span><div><h2 id="intake-title">What have you watched?</h2><p id="step-description">One title per line. A handful or a hundred.</p></div></div>
-            <div id="paste-panel">
-                <label class="visually-hidden" for="recall">Movies you confirm watching</label>
-                <textarea id="recall" rows="10" spellcheck="false" placeholder="Arrival (2016) | Loved&#10;Alien (1979) | Liked | 2020-05-12&#10;&#10;Or just paste movie titles, one per line."></textarea>
-                <p class="journal-help">Optional: <code>Title (year) | reaction | YYYY-MM-DD | note</code><br>Leave dates blank if you don't remember. Your reactions stay in your words.</p>
-                <label class="journal-confirm"><input type="checkbox" id="watched-confirmation"> These are movies I've watched.</label>
-                <button class="journal-primary" id="find-matches">Find my movies <span aria-hidden="true">→</span></button>
+    <main role="main" class="container">
+        {{ include('component/navbar.html.twig') }}
+
+        <header class="d-flex flex-wrap align-items-center justify-content-between gap-2 my-4">
+            <h2 class="mb-0">Journal</h2>
+            <div class="d-flex gap-2">
+                <a class="btn btn-outline-secondary btn-sm" href="{{ applicationUrl }}/journal/export/context">Export movie context</a>
+                <a class="btn btn-outline-secondary btn-sm" href="{{ applicationUrl }}/journal/export/csv">Export CSV</a>
             </div>
-            <div id="matches-panel" hidden><div id="matches"></div><div class="journal-actions"><button class="journal-secondary" id="back-paste">Edit my list</button><button class="journal-primary" id="review-changes">Review changes →</button></div></div>
-            <div id="review-panel" hidden><div id="changes"></div><p class="journal-help">Saving updates your journal and Movary together. A recovery checkpoint is created first. Existing watches won't gain another play.</p><div class="journal-actions"><button class="journal-secondary" id="back-matches">Back to matches</button><button class="journal-primary" id="save-journal">Save to my journal</button></div></div>
-            <div id="saved-panel" hidden><div class="journal-success-mark">✓</div><h3>Another piece of your movie story.</h3><p id="save-summary"></p><button class="journal-primary" id="add-more">Add more movies</button></div>
-            <div id="journal-status" role="status" aria-live="polite"></div>
+        </header>
+
+        <section class="journal-card" aria-labelledby="intake-title">
+            <h5 id="intake-title">Add watched movies</h5>
+            <p id="step-description" class="text-body-secondary">Paste one title per line. You'll review the matches before saving.</p>
+
+            <div id="paste-panel">
+                <label class="form-label" for="recall">Movie titles</label>
+                <textarea class="form-control" id="recall" rows="7" spellcheck="false" aria-describedby="recall-help" placeholder="Arrival (2016) | Loved&#10;Alien (1979) | Liked | 2020-05-12"></textarea>
+                <p class="form-text" id="recall-help">Optional format: Title (year) | reaction | YYYY-MM-DD | note.<br>Leave unknown dates blank. Reactions stay in your words.</p>
+                <div class="form-check my-3">
+                    <input class="form-check-input" type="checkbox" id="watched-confirmation">
+                    <label class="form-check-label" for="watched-confirmation">I've watched these movies.</label>
+                </div>
+                <button class="btn btn-primary" id="find-matches">Find matches</button>
+            </div>
+
+            <div id="matches-panel" hidden>
+                <div id="matches"></div>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-secondary" id="back-paste">Edit list</button>
+                    <button class="btn btn-primary" id="review-changes">Review changes</button>
+                </div>
+            </div>
+
+            <div id="review-panel" hidden>
+                <div id="changes"></div>
+                <p class="text-body-secondary">Saving updates your journal and Movary. Movies already marked watched won't get another play.</p>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-secondary" id="back-matches">Back to matches</button>
+                    <button class="btn btn-primary" id="save-journal">Save changes</button>
+                </div>
+            </div>
+
+            <div id="saved-panel" hidden>
+                <p id="save-summary" class="alert alert-success"></p>
+                <button class="btn btn-primary" id="add-more">Add more movies</button>
+            </div>
+            <div id="journal-status" class="mt-3 text-body-secondary" role="status" aria-live="polite"></div>
         </section>
-        <aside class="journal-aside">
-            <section class="journal-stats"><p class="journal-eyebrow">Your collection</p><strong id="seen-count">{{ journal.films|filter(f => f.status == 'Seen')|length }}</strong><p>movies remembered</p><div class="journal-aside-rule"></div><p>Every reaction adds a little more context for finding your next great watch.</p></section>
-            <section class="journal-export"><h2>Take your taste with you.</h2><p>Your history and reactions belong to you. Download them for any model, any time.</p><a href="{{ applicationUrl }}/journal/export/context">Download movie context <i class="bi bi-arrow-down-right"></i></a><a href="{{ applicationUrl }}/journal/export/csv">Download CSV <i class="bi bi-arrow-down-right"></i></a></section>
-        </aside>
-    </div>
-    <section class="journal-history"><div class="journal-history-heading"><h2>A few pages from your journal</h2><span>Reactions, exactly as you gave them</span></div><div class="journal-film-grid">
-        {% for film in journal.films|filter(f => f.status == 'Seen')|slice(0, 6) %}<article><span class="journal-year">{{ film.year }}</span><h3>{{ film.title }}</h3><span class="journal-reaction">{{ film.reaction ?: 'Watched' }}</span></article>{% endfor %}
-    </div></section>
-</main>
+
+        {% set watched = journal.films|filter(f => f.status == 'Seen') %}
+        <details class="my-4 border-top pt-3">
+            <summary>Watched movies ({{ watched|length }})</summary>
+            <div class="table-responsive mt-3">
+                <table class="table table-sm">
+                    <thead><tr><th scope="col">Movie</th><th scope="col">Year</th><th scope="col">Reaction</th><th scope="col">Watch date</th></tr></thead>
+                    <tbody>
+                    {% for film in watched %}
+                        <tr><td>{{ film.title }}</td><td>{{ film.year }}</td><td>{{ film.reaction ?: '—' }}</td><td>{{ film.date ?: 'Unknown' }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    </main>
 {% endblock %}

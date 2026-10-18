@@ -1,10 +1,10 @@
 # Movie journal (personal fork)
 
-Open **Journal** in the navigation bar. Paste confirmed watched titles, optionally using `Title (year) | reaction | YYYY-MM-DD | note`, and confirm that you watched them. Choose the correct movie versions, review the exact journal and Movary changes, then select **Save to my journal**. No terminal commands or numeric rating mapping are required.
+Open **Journal** in the navigation bar. Paste confirmed watched titles, optionally using `Title (year) | reaction | YYYY-MM-DD | note`, and confirm that you watched them. Choose the correct movie versions, review the exact journal and Movary changes, then select **Save changes**. No terminal commands or numeric rating mapping are required.
 
 The journal stores one row per film/version, preserving exact reaction words and unknown dates. An explicitly recalled watch can change an existing suggestion to Seen, but searches and suggestions cannot do that by themselves. If an existing reaction changes, the review shows both values. Conflicting known dates need separate review rather than inferring a rewatch.
 
-**Download movie context** includes the durable taste profile and complete canonical Markdown. **Download CSV** preserves viewing status, reaction, date, and provenance. Both exports require the user's existing login and are generated from the live journal.
+**Export movie context** includes the durable taste profile and complete canonical Markdown. **Export CSV** preserves viewing status, reaction, date, and provenance. Both exports require the user's existing login and are generated from the live journal.
 
 ## Storage and recovery
 

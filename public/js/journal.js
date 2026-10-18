@@ -6,8 +6,8 @@
     const panels = ['paste', 'matches', 'review', 'saved'];
     const show = name => {
         panels.forEach(panel => { byId(`${panel}-panel`).hidden = panel !== name; });
-        const labels = {paste: ['01', 'What have you watched?', 'One title per line. A handful or a hundred.'], matches: ['02', 'Make sure these are your movies.', 'Pick the right version, or skip a title for now.'], review: ['03', 'One last look.', 'These are the exact changes that will be saved.'], saved: ['✓', 'Saved to your journal.', 'Your movie context is ready for the next conversation.']};
-        [byId('step-number').textContent, byId('intake-title').textContent, byId('step-description').textContent] = labels[name];
+        const labels = {paste: ['Add watched movies', "Paste one title per line. You'll review the matches before saving."], matches: ['Review movie matches', 'Choose the correct movie for each title, or skip it.'], review: ['Review changes', 'Check these changes before saving.'], saved: ['Changes saved', '']};
+        [byId('intake-title').textContent, byId('step-description').textContent] = labels[name];
         byId('journal-status').textContent = '';
     };
     const request = async (action, body) => {
@@ -26,20 +26,20 @@
         finally { buttons.forEach(button => { button.disabled = false; }); }
     };
     const text = (parent, tag, value) => { const node = document.createElement(tag); node.textContent = value; parent.append(node); return node; };
-    byId('find-matches').addEventListener('click', () => run('Finding your movies… larger batches can take a little longer.', async () => {
+    byId('find-matches').addEventListener('click', () => run('Finding matches…', async () => {
         if (!byId('watched-confirmation').checked) throw new Error('Please confirm that these are movies you have watched.');
         draft = await request('preview', {text: byId('recall').value});
         byId('matches').replaceChildren();
         draft.items.forEach((item, index) => {
             const row = text(byId('matches'), 'section', ''); row.className = 'journal-match';
-            const label = text(row, 'label', `${item.input.title}${item.input.year ? ` (${item.input.year})` : ''}`); label.htmlFor = `match-${index}`;
-            const select = document.createElement('select'); select.id = `match-${index}`; select.dataset.index = index;
+            const label = text(row, 'label', `${item.input.title}${item.input.year ? ` (${item.input.year})` : ''}`); label.htmlFor = `match-${index}`; label.className = 'form-label';
+            const select = document.createElement('select'); select.id = `match-${index}`; select.dataset.index = index; select.className = 'form-select';
             const empty = document.createElement('option'); empty.value = ''; empty.textContent = 'Choose the correct movie…'; select.append(empty);
             item.candidates.forEach(candidate => { const option = document.createElement('option'); option.value = candidate.id; option.textContent = `${candidate.title} (${candidate.year || 'year unknown'}) · ${candidate.language} · TMDB ${candidate.id}`; select.append(option); });
             const skip = document.createElement('option'); skip.value = 'skip'; skip.textContent = 'Skip this title for now'; select.append(skip);
             if (item.selected) select.value = item.selected;
             row.append(select);
-            const overview = text(row, 'p', '');
+            const overview = text(row, 'p', ''); overview.className = 'text-body-secondary';
             const update = () => { const candidate = item.candidates.find(c => String(c.id) === select.value); overview.textContent = candidate ? candidate.overview : (item.candidates.length ? 'Choose a version before continuing.' : 'No matches found. Edit the title/year, or skip it for now.'); };
             select.addEventListener('change', update); update();
             text(row, 'p', `${item.input.reaction || 'No reaction supplied'} · ${item.input.date || 'Watch date unknown'}`);
@@ -53,7 +53,7 @@
         byId('changes').replaceChildren();
         review.changes.forEach(change => {
             const row = text(byId('changes'), 'section', ''); row.className = 'journal-change';
-            text(row, 'h3', `${change.after.title} (${change.after.year || '?'})`);
+            text(row, 'h3', `${change.after.title} (${change.after.year || '?'})`).className = 'h6';
             const after = change.after;
             text(row, 'p', `${change.before ? 'Update journal entry' : 'Add to journal'} · ${after.reaction || 'No reaction'} · ${after.date || 'Unknown watch date'}`);
             if (change.before && change.before.reaction !== after.reaction) text(row, 'p', `Reaction changes from “${change.before.reaction || 'none'}” to “${after.reaction || 'none'}”.`);
