@@ -20,6 +20,18 @@ class JournalController
     ) {
     }
 
+    public function home() : Response
+    {
+        return Response::createSensitiveSeeOther('/library');
+    }
+
+    public function library() : Response
+    {
+        return Response::createSensitive(StatusCode::createOk(), $this->twig->render('page/library.html.twig', [
+            'journal' => $this->journal->context($this->currentUser->requireUser()->getId()),
+        ]));
+    }
+
     public function render() : Response
     {
         return Response::createSensitive(StatusCode::createOk(), $this->twig->render('page/journal.html.twig', [
@@ -50,10 +62,11 @@ class JournalController
      */
     private function execute(int $userId, string $action, array $input) : array
     {
+        $input += ['text' => '', 'mediaType' => 'movie', 'id' => '', 'choices' => [], 'details' => [], 'approval' => ''];
         return match ($action) {
-            'preview' => $this->journal->preview($userId, (string)($input['text'] ?? '')),
-            'review' => $this->journal->review($userId, (string)($input['id'] ?? ''), (array)($input['choices'] ?? [])),
-            'commit' => $this->journal->commit($userId, (string)($input['id'] ?? ''), (string)($input['approval'] ?? '')),
+            'preview' => $this->journal->preview($userId, (string)$input['text'], (string)$input['mediaType']),
+            'review' => $this->journal->review($userId, (string)$input['id'], (array)$input['choices'], (array)$input['details']),
+            'commit' => $this->journal->commit($userId, (string)$input['id'], (string)$input['approval']),
             default => throw new InvalidArgumentException('Unknown journal operation.'),
         };
     }

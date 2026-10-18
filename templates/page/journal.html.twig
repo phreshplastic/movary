@@ -1,6 +1,6 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Journal{% endblock %}
+{% block title %}Add watched{% endblock %}
 
 {% block stylesheets %}
     <link rel="stylesheet" href="{{ asset_url('css/journal.css') }}">
@@ -14,25 +14,23 @@
     <main role="main" class="container">
         {{ include('component/navbar.html.twig') }}
 
-        <header class="d-flex flex-wrap align-items-center justify-content-between gap-2 my-4">
-            <h2 class="mb-0">Journal</h2>
-            <div class="d-flex gap-2">
-                <a class="btn btn-outline-secondary btn-sm" href="{{ applicationUrl }}/journal/export/context">Export movie context</a>
-                <a class="btn btn-outline-secondary btn-sm" href="{{ applicationUrl }}/journal/export/csv">Export CSV</a>
-            </div>
+        <header class="library-heading intake-heading">
+            <a class="small text-decoration-none" href="{{ applicationUrl }}/library"><i class="bi bi-chevron-left" aria-hidden="true"></i> Library</a>
+            <h1 class="mt-3">Add watched</h1>
         </header>
 
-        <section class="journal-card" aria-labelledby="intake-title">
-            <h5 id="intake-title">Add watched movies</h5>
-            <p id="step-description" class="text-body-secondary">Paste one title per line. You'll review the matches before saving.</p>
+        <section class="journal-card intake-form" aria-labelledby="intake-title">
+            <h2 class="h5" id="intake-title">Paste titles</h2>
+            <p id="step-description" class="text-body-secondary">One title per line. Add reactions, dates, and notes after matching.</p>
 
             <div id="paste-panel">
-                <label class="form-label" for="recall">Movie titles</label>
-                <textarea class="form-control" id="recall" rows="7" spellcheck="false" aria-describedby="recall-help" placeholder="Arrival (2016) | Loved&#10;Alien (1979) | Liked | 2020-05-12"></textarea>
-                <p class="form-text" id="recall-help">Optional format: Title (year) | reaction | YYYY-MM-DD | note.<br>Leave unknown dates blank. Reactions stay in your words.</p>
+                <div class="mb-3 intake-type"><label class="form-label" for="media-type">Type</label><select class="form-select" id="media-type"><option value="movie">Movies</option><option value="tv">TV shows</option></select></div>
+                <label class="form-label" for="recall">Titles</label>
+                <textarea class="form-control" id="recall" rows="7" spellcheck="false" aria-describedby="recall-help" placeholder="Arrival (2016)&#10;Alien (1979)"></textarea>
+                <div class="form-text" id="recall-help">A year helps match the right version. Leave dates blank if you don't remember.</div><details class="small text-body-secondary mt-2"><summary>Paste with details</summary><p class="mt-2">Optional format: Title (year) | reaction | YYYY-MM-DD | note</p></details>
                 <div class="form-check my-3">
                     <input class="form-check-input" type="checkbox" id="watched-confirmation">
-                    <label class="form-check-label" for="watched-confirmation">I've watched these movies.</label>
+                    <label class="form-check-label" for="watched-confirmation">I've watched these titles.</label>
                 </div>
                 <button class="btn btn-primary" id="find-matches">Find matches</button>
             </div>
@@ -47,7 +45,7 @@
 
             <div id="review-panel" hidden>
                 <div id="changes"></div>
-                <p class="text-body-secondary">Saving updates your journal and Movary. Movies already marked watched won't get another play.</p>
+                <p class="text-body-secondary">Only the changes shown here will be saved. TV records don't imply completion of every season or episode.</p>
                 <div class="d-flex flex-wrap gap-2">
                     <button class="btn btn-outline-secondary" id="back-matches">Back to matches</button>
                     <button class="btn btn-primary" id="save-journal">Save changes</button>
@@ -56,24 +54,10 @@
 
             <div id="saved-panel" hidden>
                 <p id="save-summary" class="alert alert-success"></p>
-                <button class="btn btn-primary" id="add-more">Add more movies</button>
+                <div class="d-flex gap-2"><a class="btn btn-primary" href="{{ applicationUrl }}/library">View library</a><button class="btn btn-outline-secondary" id="add-more">Add more</button></div>
             </div>
             <div id="journal-status" class="mt-3 text-body-secondary" role="status" aria-live="polite"></div>
         </section>
 
-        {% set watched = journal.films|filter(f => f.status == 'Seen') %}
-        <details class="my-4 border-top pt-3">
-            <summary>Watched movies ({{ watched|length }})</summary>
-            <div class="table-responsive mt-3">
-                <table class="table table-sm">
-                    <thead><tr><th scope="col">Movie</th><th scope="col">Year</th><th scope="col">Reaction</th><th scope="col">Watch date</th></tr></thead>
-                    <tbody>
-                    {% for film in watched %}
-                        <tr><td>{{ film.title }}</td><td>{{ film.year }}</td><td>{{ film.reaction ?: '—' }}</td><td>{{ film.date ?: 'Unknown' }}</td></tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </details>
     </main>
 {% endblock %}

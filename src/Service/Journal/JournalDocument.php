@@ -20,13 +20,27 @@ class JournalDocument
     /** @return list<Film> */
     public function read(string $markdown) : array
     {
+        $markdown = explode("\n## TV shows\n", $markdown, 2)[0];
+        return $this->readTable($markdown, false);
+    }
+
+    /** @return list<Film> */
+    public function readShows(string $markdown) : array
+    {
+        $section = explode("\n## TV shows\n", $markdown, 2)[1] ?? '';
+        return $this->readTable($section, true);
+    }
+
+    /** @return list<Film> */
+    private function readTable(string $markdown, bool $allowEmpty) : array
+    {
         $films = [];
         foreach (explode("\n", $markdown) as $line) {
             if (str_starts_with($line, '|') === false) {
                 continue;
             }
             $cells = array_map('trim', explode('|', trim($line, "|\r\n")));
-            if (($cells[0]) === 'Film' || preg_match('/^[-: ]+$/', $cells[0]) === 1) {
+            if (in_array($cells[0], ['Film', 'TV show'], true) || preg_match('/^[-: ]+$/', $cells[0]) === 1) {
                 continue;
             }
             if (count($cells) !== 6 || in_array($cells[2], ['Seen', 'Not seen', 'Unconfirmed'], true) === false) {
@@ -36,8 +50,8 @@ class JournalDocument
             $films[] = ['title' => $cells[0], 'year' => $cells[1], 'status' => $cells[2],
                 'reaction' => $cells[3], 'date' => $cells[4], 'note' => $cells[5]];
         }
-        if ($films === []) {
-            throw new InvalidArgumentException('The journal has not been initialized.');
+        if ($films === [] && $allowEmpty === false) {
+            throw new InvalidArgumentException('The library has not been initialized.');
         }
 
         return $films;
@@ -63,7 +77,7 @@ class JournalDocument
             $films[$key] = $film;
         }
         if ($films === [] || count($films) > 100) {
-            throw new InvalidArgumentException('Paste between 1 and 100 watched movies.');
+            throw new InvalidArgumentException('Paste between 1 and 100 watched titles.');
         }
 
         return array_values($films);
@@ -84,16 +98,40 @@ class JournalDocument
             $year = $m[2];
         }
         if ($title === '') {
-            throw new InvalidArgumentException('Each line needs a movie title.');
+            throw new InvalidArgumentException('Each line needs a title.');
         }
-        if ($cells[2] !== '') {
-            $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $cells[2]);
-            if ($date === false || $date->format('Y-m-d') !== $cells[2]) {
-                throw new InvalidArgumentException('Use YYYY-MM-DD for known dates, or leave the date blank.');
-            }
-        }
+        $this->validateDate($cells[2]);
 
         return ['title' => $title, 'year' => $year, 'status' => 'Seen', 'reaction' => $cells[1], 'date' => $cells[2], 'note' => $cells[3]];
+    }
+
+    /**
+     * @param Film $film
+     * @param array<array-key,mixed> $details
+     * @return Film
+     */
+    public function withDetails(array $film, array $details) : array
+    {
+        foreach ($details as $key => $value) {
+            if (in_array($key, ['reaction', 'date', 'note'], true) === false || is_string($value) === false || strlen($value) > 2000) {
+                throw new InvalidArgumentException('Details must be a reaction, date, or note of at most 2000 characters.');
+            }
+            $film[$key] = trim($value);
+        }
+        $this->validateDate($film['date']);
+
+        return $film;
+    }
+
+    private function validateDate(string $value) : void
+    {
+        if ($value === '') {
+            return;
+        }
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        if ($date === false || $date->format('Y-m-d') !== $value) {
+            throw new InvalidArgumentException('Use YYYY-MM-DD for known dates, or leave the date blank.');
+        }
     }
 
     /**
@@ -143,6 +181,18 @@ class JournalDocument
         }
 
         return $existing . ($existing === '' ? '' : '; ') . $incoming;
+    }
+
+    /** @param list<Film> $shows */
+    public function renderShows(string $markdown, array $shows) : string
+    {
+        $parts = explode("\n## TV shows\n", $markdown, 2);
+        $section = $parts[1] ?? "\n| TV show | Year | Status | Reaction | Watch date | Evidence / note |\n| --- | --- | --- | --- | --- | --- |\n";
+        $section = str_replace('| TV show | Year |', '| Film | Year |', $section);
+        $section = $this->render($section, $shows);
+        $section = str_replace('| Film | Year |', '| TV show | Year |', $section);
+
+        return rtrim($parts[0]) . "\n\n## TV shows\n" . $section;
     }
 
     /** @param list<Film> $films */

@@ -37,6 +37,7 @@ class JournalServiceTest extends TestCase
         $this->db->insert('movie', ['id' => 1, 'tmdb_id' => 949]);
         $tmdb = $this->createStub(TmdbApi::class);
         $tmdb->method('searchMovie')->willReturn(['results' => [['id' => 949, 'title' => 'Heat', 'release_date' => '1995-12-15']], 'total_pages' => 1]);
+        $tmdb->method('searchTv')->willReturn(['results' => [['id' => 949, 'name' => 'Heat', 'first_air_date' => '2024-01-01']], 'total_pages' => 1]);
         $movie = $this->createStub(MovieEntity::class);
         $movie->method('getId')->willReturn(1);
         $movies = $this->createStub(MovieApi::class);
@@ -127,5 +128,49 @@ class JournalServiceTest extends TestCase
         self::assertTrue($result['verified']);
         self::assertSame(1, $this->db->fetchOne('SELECT plays FROM movie_user_watch_dates'));
         self::assertSame('Loved', $this->journal->context(1)['films'][0]['reaction']);
+    }
+    public function testTvWithCollidingMovieIdUsesOnlyCanonicalLibraryAndIsRerunnable() : void
+    {
+        $before = $this->journal->context(1)['films'];
+        $draft = $this->journal->preview(1, 'Heat (2024)', 'tv');
+        self::assertSame(949, $draft['items'][0]['selected']);
+        $review = $this->journal->review(1, $draft['id'], [], ['0' => ['reaction' => 'Enjoyed', 'note' => 'Watched one season.']]);
+        self::assertSame('library-only', $review['changes'][0]['play']);
+        $receipt = $this->journal->commit(1, $draft['id'], $review['approval']);
+        self::assertSame($receipt, $this->journal->commit(1, $draft['id'], $review['approval']));
+        self::assertSame($before, $this->journal->context(1)['films']);
+        self::assertSame(0, $this->db->fetchOne('SELECT COUNT(*) FROM movie_user_watch_dates'));
+        $again = $this->journal->preview(1, 'Heat (2024)', 'tv');
+        $againReview = $this->journal->review(1, $again['id'], []);
+        $this->journal->commit(1, $again['id'], $againReview['approval']);
+        $shows = $this->journal->context(1)['shows'];
+        self::assertCount(1, $shows);
+        self::assertSame('Enjoyed', $shows[0]['reaction']);
+        self::assertSame('', $shows[0]['date']);
+        self::assertSame('Watched one season.', $shows[0]['note']);
+        self::assertStringContainsString('tv,Heat,2024,Seen,Enjoyed,', $this->journal->export(1, 'csv'));
+        self::assertStringContainsString('## TV shows', $this->journal->export(1, 'context'));
+    }
+
+    public function testTvSaveRecoversFromInterruptedCanonicalWriteWithoutMoviePlays() : void
+    {
+        $draft = $this->journal->preview(1, 'Heat (2024)', 'tv');
+        $review = $this->journal->review(1, $draft['id'], []);
+        $this->store->failCanonical = true;
+        try {
+            $this->journal->commit(1, $draft['id'], $review['approval']);
+            self::fail('Expected interrupted file write');
+        } catch (\RuntimeException $e) {
+            self::assertSame('Simulated interrupted canonical write', $e->getMessage());
+        }
+        $this->journal->commit(1, $draft['id'], $review['approval']);
+        self::assertCount(1, $this->journal->context(1)['shows']);
+        self::assertSame(0, $this->db->fetchOne('SELECT COUNT(*) FROM movie_user_watch_dates'));
+    }
+
+    public function testUnknownMediaTypeCannotStartADraft() : void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->journal->preview(1, 'Heat (1995)', 'podcast');
     }
 }

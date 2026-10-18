@@ -100,4 +100,41 @@ class JournalDocumentTest extends TestCase
         self::assertSame('Survey confirmation.; Great dialogue.', $merged['after']['note']);
         self::assertSame($merged['after']['note'], $rerun['after']['note']);
     }
+    public function testTvSectionRoundTripDoesNotChangeMovieRecords() : void
+    {
+        $document = new JournalDocument();
+        $movies = $document->parse('Heat (1995) | Liked');
+        $markdown = $document->render("| Film | Year | Status | Reaction | Watch date | Evidence / note |\n| --- | --- | --- | --- | --- | --- |\n\nFranchise uncertainty remains.\n", $movies);
+        self::assertSame([], $document->readShows($markdown));
+        $shows = $document->parse('Heat (2024) | Enjoyed | | Watched one season, not all episodes.');
+        $shows[0]['note'] .= ' Cost $1 | exact.';
+        $rendered = $document->renderShows($markdown, $shows);
+
+        self::assertSame($movies, $document->read($rendered));
+        self::assertSame($shows, $document->readShows($rendered));
+        self::assertStringContainsString('Franchise uncertainty remains.', $rendered);
+        $movies[0]['reaction'] = 'Loved';
+        $updated = $document->render($rendered, $movies);
+        self::assertSame($shows, $document->readShows($updated));
+        self::assertSame($movies, $document->read($updated));
+        self::assertSame($updated, $document->renderShows($updated, $shows));
+    }
+
+    public function testReviewDetailsPreserveFreeformReactionAndValidateDate() : void
+    {
+        $document = new JournalDocument();
+        $film = $document->parse('Heat (1995)')[0];
+        $updated = $document->withDetails($film, ['reaction' => 'Loved | great dialogue', 'note' => 'Only the first season', 'date' => '2020-02-29']);
+        self::assertSame('Loved | great dialogue', $updated['reaction']);
+        self::assertSame('2020-02-29', $updated['date']);
+        $this->expectException(InvalidArgumentException::class);
+        $document->withDetails($film, ['date' => '2021-02-29']);
+    }
+
+    public function testReviewDetailsCannotOverrideViewingEvidence() : void
+    {
+        $document = new JournalDocument();
+        $this->expectException(InvalidArgumentException::class);
+        $document->withDetails($document->parse('Heat (1995)')[0], ['status' => 'Not seen']);
+    }
 }

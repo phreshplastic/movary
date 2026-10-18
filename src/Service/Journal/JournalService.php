@@ -13,6 +13,10 @@ use Movary\ValueObject\Year;
 use RuntimeException;
 use Throwable;
 
+/**
+ * @phpstan-import-type Film from JournalDocument
+ * @psalm-import-type Film from JournalDocument
+ */
 class JournalService
 {
     public function __construct(
@@ -26,22 +30,25 @@ class JournalService
     ) {
     }
 
-    /** @return array<string,mixed> */
+    /** @return array{version:string,films:list<Film>,shows:list<Film>,taste:string} */
     public function context(int $userId) : array
     {
         $markdown = $this->store->read($userId, 'WATCH_HISTORY.md');
 
         return ['version' => hash('sha256', $markdown), 'films' => $this->document->read($markdown),
-            'taste' => $this->store->read($userId, 'TASTE_PROFILE.md')];
+            'shows' => $this->document->readShows($markdown), 'taste' => $this->store->read($userId, 'TASTE_PROFILE.md')];
     }
 
     /** @return array<string,mixed> */
-    public function preview(int $userId, string $text) : array
+    public function preview(int $userId, string $text, string $mediaType = 'movie') : array
     {
+        if (in_array($mediaType, ['movie', 'tv'], true) === false) {
+            throw new InvalidArgumentException('Choose Movies or TV shows.');
+        }
         $markdown = $this->store->read($userId, 'WATCH_HISTORY.md');
         $items = [];
         foreach ($this->document->parse($text) as $film) {
-            $candidates = $this->search($film['title'], $film['year']);
+            $candidates = $this->search($film['title'], $film['year'], $mediaType);
             $exact = array_values(array_filter($candidates, fn(array $c) : bool =>
                 $film['year'] !== '' && $c['year'] === $film['year']
                 && $this->document->normalize($c['title']) === $this->document->normalize($film['title'])));
@@ -49,24 +56,27 @@ class JournalService
                 'selected' => count($exact) === 1 ? $exact[0]['id'] : null];
         }
         $id = bin2hex(random_bytes(16));
-        $draft = ['id' => $id, 'expires' => time() + 7200, 'base' => hash('sha256', $markdown), 'items' => $items];
+        $draft = ['id' => $id, 'expires' => time() + 7200, 'base' => hash('sha256', $markdown), 'mediaType' => $mediaType, 'items' => $items];
         $this->store->saveDraft($userId, $id, $draft);
 
         return $draft;
     }
 
     /**
-     * @param array<string,mixed> $choices
+     * @param array<array-key,mixed> $choices
+     * @param array<array-key,mixed> $details
      * @return array<string,mixed>
      */
-    public function review(int $userId, string $id, array $choices) : array
+    public function review(int $userId, string $id, array $choices, array $details = []) : array
     {
         $draft = $this->store->draft($userId, $id);
         $markdown = $this->store->read($userId, 'WATCH_HISTORY.md');
         if ($draft['base'] !== hash('sha256', $markdown)) {
             throw new InvalidArgumentException('The journal changed. Start a fresh review.');
         }
-        $films = $this->document->read($markdown);
+        $draft += ['mediaType' => 'movie'];
+        $mediaType = $draft['mediaType'];
+        $films = $mediaType === 'tv' ? $this->document->readShows($markdown) : $this->document->read($markdown);
         $changes = [];
         $selected = [];
         foreach ($draft['items'] as $i => $item) {
@@ -76,23 +86,24 @@ class JournalService
             }
             $candidate = $this->candidate($item['candidates'], (int)$choice);
             if (in_array($candidate['id'], $selected, true)) {
-                throw new InvalidArgumentException('Two lines select the same movie. Keep only one.');
+                throw new InvalidArgumentException('Two lines select the same title. Keep only one.');
             }
             $selected[] = $candidate['id'];
             $film = $item['input'];
             $film['title'] = $candidate['title'];
             $film['year'] = $candidate['year'];
+            $film = $this->document->withDetails($film, (array)($details[(string)$i] ?? []));
             $merged = $this->document->merge($films, $film);
             $films = $merged['films'];
-            $action = $this->playAction($userId, $candidate['id'], $merged['after']['date']);
+            $action = $mediaType === 'tv' ? 'library-only' : $this->playAction($userId, $candidate['id'], $merged['after']['date']);
             $changes[] = ['before' => $merged['before'], 'after' => $merged['after'],
-                'tmdbId' => $candidate['id'], 'play' => $action];
+                'tmdbId' => $candidate['id'], 'mediaType' => $mediaType, 'play' => $action];
         }
         if ($changes === []) {
-            throw new InvalidArgumentException('Choose at least one confirmed movie.');
+            throw new InvalidArgumentException('Choose at least one confirmed title.');
         }
         $plan = ['id' => $id, 'base' => $draft['base'], 'changes' => $changes,
-            'markdown' => $this->document->render($markdown, $films), 'playedVersion' => $this->playedVersion($userId)];
+            'markdown' => $mediaType === 'tv' ? $this->document->renderShows($markdown, $films) : $this->document->render($markdown, $films), 'playedVersion' => $this->playedVersion($userId)];
         $draft['plan'] = $plan;
         $draft['approval'] = hash('sha256', json_encode($plan, JSON_THROW_ON_ERROR));
         $this->store->saveDraft($userId, $id, $draft);
@@ -124,6 +135,9 @@ class JournalService
             // Resolve metadata before opening the play transaction; it may call TMDB.
             $movieIds = [];
             foreach ($plan['changes'] as $change) {
+                if ($change['play'] === 'library-only') {
+                    continue;
+                }
                 $movie = $this->movies->findByTmdbId($change['tmdbId']) ?? $this->syncMovie->syncMovie($change['tmdbId']);
                 $movieIds[$change['tmdbId']] = $movie->getId();
             }
@@ -140,7 +154,7 @@ class JournalService
             return false;
         }
         foreach ($draft['plan']['changes'] as $change) {
-            if ($this->playAction($userId, $change['tmdbId'], $change['after']['date']) !== 'already-watched') {
+            if ($change['play'] !== 'library-only' && $this->playAction($userId, $change['tmdbId'], $change['after']['date']) !== 'already-watched') {
                 return false;
             }
         }
@@ -170,7 +184,7 @@ class JournalService
                     $watched === '' ? null : Date::createFromString($watched), postToMastodon: false);
             }
             foreach ($plan['changes'] as $change) {
-                if ($this->playAction($userId, $change['tmdbId'], $change['after']['date']) !== 'already-watched') {
+                if ($change['play'] !== 'library-only' && $this->playAction($userId, $change['tmdbId'], $change['after']['date']) !== 'already-watched') {
                     throw new RuntimeException('Play readback did not match the reviewed change.');
                 }
                 if ($change['play'] === 'add') {
@@ -219,16 +233,18 @@ class JournalService
     {
         $markdown = $this->store->read($userId, 'WATCH_HISTORY.md');
         if ($format === 'context') {
-            return "# Private movie context\n\nOnly Seen confirms viewing. Preserve reaction words; blank dates are unknown.\n\n"
+            return "# Private watched library context\n\nOnly Seen confirms viewing. Preserve reaction words; blank dates are unknown.\n\n"
                 . $this->store->read($userId, 'TASTE_PROFILE.md') . "\n\n" . $markdown;
         }
         $stream = fopen('php://temp', 'r+');
         if ($stream === false) {
             throw new RuntimeException('Unable to create export.');
         }
-        fputcsv($stream, ['Film', 'Year', 'Status', 'Reaction', 'Watch date', 'Evidence / note'], escape: '');
-        foreach ($this->document->read($markdown) as $film) {
-            fputcsv($stream, array_values($film), escape: '');
+        fputcsv($stream, ['Type', 'Title', 'Year', 'Status', 'Reaction', 'Watch date', 'Evidence / note'], escape: '');
+        foreach (['movie' => $this->document->read($markdown), 'tv' => $this->document->readShows($markdown)] as $type => $entries) {
+            foreach ($entries as $entry) {
+                fputcsv($stream, [$type, ...array_values($entry)], escape: '');
+            }
         }
         rewind($stream);
         $csv = stream_get_contents($stream);
@@ -238,16 +254,15 @@ class JournalService
     }
 
     /** @return list<array{id:int,title:string,year:string,overview:string,language:string}> */
-    private function search(string $title, string $year) : array
+    private function search(string $title, string $year, string $mediaType) : array
     {
         $candidates = [];
         $page = 1;
         do {
-            $response = $this->tmdb->searchMovie($title, $year === '' ? null : Year::createFromString($year), $page);
+            $releaseYear = $year === '' ? null : Year::createFromString($year);
+            $response = $mediaType === 'tv' ? $this->tmdb->searchTv($title, $releaseYear, $page) : $this->tmdb->searchMovie($title, $releaseYear, $page);
             foreach ($response['results'] as $movie) {
-                $candidates[] = ['id' => (int)$movie['id'], 'title' => (string)$movie['title'],
-                    'year' => substr((string)($movie['release_date'] ?? ''), 0, 4),
-                    'overview' => (string)($movie['overview'] ?? ''), 'language' => (string)($movie['original_language'] ?? '')];
+                $candidates[] = $this->describeMatch($movie, $mediaType);
             }
             ++$page;
             if ($page > 20 && $page <= ($response['total_pages'] ?? 1)) {
@@ -256,6 +271,17 @@ class JournalService
         } while ($page <= ($response['total_pages'] ?? 1));
 
         return $candidates;
+    }
+
+    /**
+     * @param array<string,mixed> $movie
+     * @return array{id:int,title:string,year:string,overview:string,language:string}
+     */
+    private function describeMatch(array $movie, string $mediaType) : array
+    {
+        return ['id' => (int)$movie['id'], 'title' => (string)($mediaType === 'tv' ? $movie['name'] : $movie['title']),
+            'year' => substr((string)($movie[$mediaType === 'tv' ? 'first_air_date' : 'release_date'] ?? ''), 0, 4),
+            'overview' => (string)($movie['overview'] ?? ''), 'language' => (string)($movie['original_language'] ?? '')];
     }
 
     /**
@@ -269,7 +295,7 @@ class JournalService
                 return $candidate;
             }
         }
-        throw new InvalidArgumentException('Choose the correct version for every movie, or skip the line.');
+        throw new InvalidArgumentException('Choose the correct version for every title, or skip the line.');
     }
 
     private function playAction(int $userId, int $tmdbId, string $date) : string

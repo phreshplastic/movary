@@ -1,0 +1,47 @@
+{% extends 'base.html.twig' %}
+{% block title %}Library{% endblock %}
+{% block scripts %}<script src="{{ asset_url('js/library.js') }}"></script>{% endblock %}
+{% block body %}
+<main role="main" class="container">
+    {{ include('component/navbar.html.twig') }}
+    {% set movies = journal.films|filter(f => f.status == 'Seen') %}
+    {% set shows = journal.shows|filter(f => f.status == 'Seen') %}
+    <header class="library-heading">
+        <h1>Library</h1>
+        <p class="text-body-secondary mb-0">{{ movies|length }} watched movies · {{ shows|length }} watched TV shows</p>
+    </header>
+    <div class="library-toolbar">
+        <label class="visually-hidden" for="library-search">Search your library</label>
+        <input class="form-control" id="library-search" type="search" placeholder="Search titles, reactions, or notes">
+        <label class="visually-hidden" for="library-type">Title type</label>
+        <select class="form-select" id="library-type"><option value="all">Movies &amp; TV</option><option value="movie">Movies</option><option value="tv">TV shows</option></select>
+        <label class="visually-hidden" for="library-status">Viewing status</label>
+        <select class="form-select" id="library-status"><option value="Seen">Watched</option><option value="Not seen">Not watched</option><option value="Unconfirmed">Unconfirmed</option><option value="all">All records</option></select>
+        <div class="dropdown">
+            <button class="btn btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false">Export</button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="{{ applicationUrl }}/journal/export/context">Context for chat</a></li>
+                <li><a class="dropdown-item" href="{{ applicationUrl }}/journal/export/csv">CSV</a></li>
+            </ul>
+        </div>
+    </div>
+    <div class="library-table-wrap table-responsive">
+        <table class="table mb-0 library-table">
+            <thead><tr><th scope="col">Title</th><th scope="col">Type</th><th scope="col">Reaction</th><th scope="col" class="d-none d-md-table-cell">Watch date</th></tr></thead>
+            <tbody id="library-rows">
+            {% for type, entries in {'movie': journal.films, 'tv': journal.shows} %}
+                {% for entry in entries %}
+                <tr data-type="{{ type }}" data-status="{{ entry.status }}" data-search="{{ entry.title }} {{ entry.year }} {{ entry.reaction }} {{ entry.note }}" {% if entry.status != 'Seen' %}hidden{% endif %}>
+                    <td><span class="library-title">{{ entry.title }}</span>{% if entry.year %}<span class="text-body-secondary ms-2">{{ entry.year }}</span>{% endif %}{% if entry.status != 'Seen' %}<div class="small text-body-secondary">{{ entry.status == 'Not seen' ? 'Not watched' : 'Unconfirmed' }}</div>{% endif %}{% if entry.note %}<details class="library-note"><summary>Notes</summary><p>{{ entry.note }}</p></details>{% endif %}</td>
+                    <td class="text-body-secondary">{{ type == 'tv' ? 'TV show' : 'Movie' }}</td>
+                    <td>{{ entry.reaction ?: '—' }}</td><td class="text-body-secondary d-none d-md-table-cell">{{ entry.date ?: 'Unknown' }}</td>
+                </tr>
+                {% endfor %}
+            {% endfor %}
+            </tbody>
+        </table>
+        <p id="library-empty" class="p-4 mb-0 text-body-secondary" hidden>No matching titles. <a href="{{ applicationUrl }}/add-watched" id="library-empty-add">Add watched titles</a>.</p>
+    </div>
+    <p class="small text-body-secondary mt-3" id="library-count" role="status"></p>
+</main>
+{% endblock %}

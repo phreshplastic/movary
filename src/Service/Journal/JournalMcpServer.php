@@ -46,7 +46,7 @@ class JournalMcpServer
     {
         return match ($method) {
                 'initialize' => ['protocolVersion' => '2025-11-25', 'capabilities' => ['tools' => (object)[]],
-                    'serverInfo' => ['name' => 'movie-journal', 'version' => '0.1.0'],
+                    'serverInfo' => ['name' => 'watched-library', 'version' => '0.2.0'],
                     'instructions' => 'Only canonical Seen rows prove viewing. Preserve reactions and unknown dates. Preview and review all writes, obtain the human approval of those changes, then commit the exact approval token. Never infer a watch from a recommendation or search result.'],
                 'ping' => (object)[],
                 'tools/list' => ['tools' => $this->tools($writeEnabled)],
@@ -58,20 +58,20 @@ class JournalMcpServer
     /** @return list<array<string,mixed>> */
     private function tools(bool $writeEnabled) : array
     {
-        $tools = [['name' => 'movie_context', 'description' => 'Read canonical viewing status, exact reactions, notes, dates, and durable taste. Only Seen is confirmed viewing.',
+        $tools = [['name' => 'library_context', 'description' => 'Read the watched library: films and TV shows, exact reactions, notes, dates, and durable taste. TV Seen means watched, not completion of every episode. Only Seen is confirmed viewing.',
             'inputSchema' => ['type' => 'object', 'properties' => (object)[], 'additionalProperties' => false],
             'annotations' => ['readOnlyHint' => true, 'destructiveHint' => false, 'idempotentHint' => true, 'openWorldHint' => false]]];
         if ($writeEnabled === false) {
             return $tools;
         }
         foreach ([
-            ['preview_watched_movies', 'Prepare a draft from explicitly confirmed watched movies, one title per line with optional (year) | reaction | YYYY-MM-DD | note. This searches metadata and changes no canonical watches.', ['text' => ['type' => 'string']], ['text']],
-            ['review_watched_movies', 'Select movie versions by candidate TMDB ID (or skip) keyed by zero-based draft row. Return exact canonical and Movary changes for human review. Do not commit until the human approves these changes.', ['id' => ['type' => 'string'], 'choices' => ['type' => 'object', 'additionalProperties' => ['type' => ['string', 'integer']]]], ['id', 'choices']],
-            ['commit_watched_movies', 'Commit an exact reviewed batch only after human approval. Creates a recovery checkpoint, preserves unknown dates and words, verifies plays, and returns an idempotent receipt.', ['id' => ['type' => 'string'], 'approval' => ['type' => 'string']], ['id', 'approval']],
+            ['preview_watched_titles', 'Prepare a draft from explicitly confirmed watched titles. Set mediaType=tv for TV shows; default movie. Use one title per line with optional (year) | reaction | YYYY-MM-DD | note. This searches metadata and changes no canonical watches.', ['text' => ['type' => 'string'], 'mediaType' => ['type' => 'string', 'enum' => ['movie', 'tv'], 'default' => 'movie']], ['text']],
+            ['review_watched_titles', 'Select title versions by candidate TMDB ID (or skip) keyed by zero-based draft row. Return exact canonical and Movary changes for human review. Do not commit until the human approves these changes.', ['id' => ['type' => 'string'], 'choices' => ['type' => 'object', 'additionalProperties' => ['type' => ['string', 'integer']]], 'details' => ['type' => 'object', 'additionalProperties' => ['type' => 'object', 'properties' => ['reaction' => ['type' => 'string'], 'date' => ['type' => 'string'], 'note' => ['type' => 'string']], 'additionalProperties' => false]]], ['id', 'choices']],
+            ['commit_watched_titles', 'Commit an exact reviewed batch only after human approval. Creates a recovery checkpoint, preserves unknown dates and words, verifies plays, and returns an idempotent receipt.', ['id' => ['type' => 'string'], 'approval' => ['type' => 'string']], ['id', 'approval']],
         ] as [$name, $description, $properties, $required]) {
             $tools[] = ['name' => $name, 'description' => $description,
                 'inputSchema' => ['type' => 'object', 'properties' => $properties, 'required' => $required, 'additionalProperties' => false],
-                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'idempotentHint' => $name === 'commit_watched_movies', 'openWorldHint' => $name === 'preview_watched_movies']];
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'idempotentHint' => $name === 'commit_watched_titles', 'openWorldHint' => $name === 'preview_watched_titles']];
         }
 
         return $tools;
@@ -85,7 +85,7 @@ class JournalMcpServer
     {
         $name = (string)($params['name'] ?? '');
         $arguments = (array)($params['arguments'] ?? []);
-        if ($name !== 'movie_context' && $writeEnabled === false) {
+        if (in_array($name, ['movie_context', 'library_context'], true) === false && $writeEnabled === false) {
             throw new InvalidArgumentException('This connection has read-only access.');
         }
         try {
@@ -103,11 +103,12 @@ class JournalMcpServer
      */
     private function invoke(int $userId, string $name, array $arguments) : array
     {
+        $arguments += ['text' => '', 'mediaType' => 'movie', 'id' => '', 'choices' => [], 'details' => [], 'approval' => ''];
         return match ($name) {
-            'movie_context' => $this->journal->context($userId),
-            'preview_watched_movies' => $this->journal->preview($userId, (string)($arguments['text'] ?? '')),
-            'review_watched_movies' => $this->journal->review($userId, (string)($arguments['id'] ?? ''), (array)($arguments['choices'] ?? [])),
-            'commit_watched_movies' => $this->journal->commit($userId, (string)($arguments['id'] ?? ''), (string)($arguments['approval'] ?? '')),
+            'movie_context', 'library_context' => $this->journal->context($userId),
+            'preview_watched_movies', 'preview_watched_titles' => $this->journal->preview($userId, (string)$arguments['text'], (string)$arguments['mediaType']),
+            'review_watched_movies', 'review_watched_titles' => $this->journal->review($userId, (string)$arguments['id'], (array)$arguments['choices'], (array)$arguments['details']),
+            'commit_watched_movies', 'commit_watched_titles' => $this->journal->commit($userId, (string)$arguments['id'], (string)$arguments['approval']),
             default => throw new InvalidArgumentException('Unknown journal tool.'),
         };
     }

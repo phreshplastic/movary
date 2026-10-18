@@ -1,69 +1,32 @@
-<nav class="navbar navbar-dark bg-dark">
+<nav class="navbar app-navbar" aria-label="Main navigation">
     <div class="container">
-        <a class="navbar-brand" href="{{ applicationUrl }}/" id="navbarBrand">{{ applicationName ?? 'Movary' }}</a>
-        {% if loggedIn == true %}
-        <div class="btn-group">
+        <a class="navbar-brand" href="{{ applicationUrl }}{{ loggedIn ? '/library' : '/' }}" id="navbarBrand">Watch library</a>
+        <div class="app-nav-actions">
+            {% if loggedIn %}
+                <a class="btn btn-primary" href="{{ applicationUrl }}/add-watched" {% if requestUrlPath in ['/add-watched', '/journal'] %}aria-current="page"{% endif %}><i class="bi bi-plus-lg" aria-hidden="true"></i> Add watched</a>
             {% endif %}
-            {% if loggedIn == true %}
-                <a class="btn btn-outline-light" href="{{ applicationUrl }}/journal" style="border-color: #9d9d9d">Journal</a>
-                <button type="button" class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#logPlayModal" style="border-color: #9d9d9d">
-                    Add movie
-                </button>
-            {% endif %}
-            <button type="button" class="btn btn-outline-light" data-bs-toggle="dropdown" aria-expanded="false" style="border-color: #9d9d9d;">
-                <i class="bi bi-three-dots-vertical"></i>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end">
-                <li>
-                    <a class="dropdown-item {% if requestUrlPath matches '#^\/[^\/]+\/[^\/]+$#' %}active{% endif %}"
-                       href="{{ applicationUrl }}/users/{{ routeUsername ?: currentUserName }}">
-                        Dashboard
-                    </a>
-                </li>
-                <li><a class="dropdown-item {% if requestUrlPath matches '#\/.+\/history#' %}active{% endif %}"
-                       href="{{ applicationUrl }}/users/{{ routeUsername ?: currentUserName }}/history">
-                        History
-                    </a>
-                </li>
-                <li><a class="dropdown-item {% if requestUrlPath matches '#\/.+\/watchlist#' %}active{% endif %}"
-                       href="{{ applicationUrl }}/users/{{ routeUsername ?: currentUserName }}/watchlist">
-                        Watchlist
-                    </a>
-                </li>
-                <li><a class="dropdown-item {% if requestUrlPath matches '#\/.+\/movies#' %}active{% endif %}"
-                       href="{{ applicationUrl }}/users/{{ routeUsername ?: currentUserName }}/movies">
-                        All Movies</a>
-                </li>
-                <li><a class="dropdown-item {% if requestUrlPath matches '#\/.+\/actors#' %}active{% endif %}"
-                       href="{{ applicationUrl }}/users/{{ routeUsername ?: currentUserName }}/actors">
-                        Top Actors
-                    </a>
-                </li>
-                <li><a class="dropdown-item {% if requestUrlPath matches '#\/.+\/directors#' %}active{% endif %}"
-                       href="{{ applicationUrl }}/users/{{ routeUsername ?: currentUserName }}/directors">
-                        Top Directors
-                    </a>
-                </li>
-                <li>
-                    <hr class="dropdown-divider">
-                </li>
-                {% if loggedIn == true %}
-                    <li><a class="dropdown-item {% if requestUrlPath starts with '/settings/' %}active{% endif %}" href="{{ applicationUrl }}/settings/account/general">Settings</a></li>
-                    <li><button class="dropdown-item" onclick="logout()" style="cursor: pointer">Logout</button></li>
-                {% else %}
-                    <li><a class="dropdown-item" href="{{ applicationUrl }}/login">Login</a></li>
-                {% endif %}
-                <li>
-                    <hr class="dropdown-divider">
-                </li>
-                <div class="form-check form-switch" style="margin-left: 1rem">
-                    <input class="form-check-input" type="checkbox" onclick="toggleThemeSwitch()" role="switch" id="darkModeInput">
-                    <label class="form-check-label" for="darkModeInput">Dark Mode</label>
-                </div>
-            </ul>
-            {% if loggedIn == true %}</div>{% endif %}
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Settings"><i class="bi bi-gear" aria-hidden="true"></i><span class="d-none d-sm-inline"> Settings</span></button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    {% if loggedIn %}
+                        <li><a class="dropdown-item" href="{{ applicationUrl }}/settings/account/general">Settings</a></li>
+                        <li><a class="dropdown-item" href="{{ applicationUrl }}/users/{{ currentUserName }}">Advanced movie tools</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                    {% else %}
+                        <li><a class="dropdown-item" href="{{ applicationUrl }}/login">Sign in</a></li>
+                    {% endif %}
+                    <li><div class="form-check form-switch mx-3 my-2">
+                        <input class="form-check-input" type="checkbox" onclick="toggleThemeSwitch()" role="switch" id="darkModeInput">
+                        <label class="form-check-label" for="darkModeInput">Dark mode</label>
+                    </div></li>
+                    {% if loggedIn %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button class="dropdown-item" onclick="logout()">Sign out</button></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
     </div>
 </nav>
-<hr style="margin: 0;" class="{{ theme == 'dark' ? '' : 'd-none' }}" id="darkModeNavHr">
-
+<hr class="d-none" id="darkModeNavHr">
 {{ include('component/modal-log-play.html.twig') }}
