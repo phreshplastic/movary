@@ -313,8 +313,69 @@
         $('history-more').onclick = () => run(loadHistory); await loadHistory();
     }
 
+    function seasonEditor() {
+        const dialog = $('season-dialog');
+        let title, requestId, pending = null, opening = 0;
+        function renderSeasons() {
+            const selected = $('season-number').value; $('season-number').replaceChildren();
+            for (const season of title.metadata.seasons || []) {
+                const assessment = title.seasonAssessments.find(item => item.season === season.season_number);
+                const name = season.name || `Season ${season.season_number}`;
+                $('season-number').append(new Option(name + (assessment ? ` · ${assessment.reaction || 'No assessment'}` : ''), String(season.season_number)));
+            }
+            const options = Array.from($('season-number').options);
+            $('season-number').value = options.some(option => option.value === selected) ? selected : (options.find(option => Number(option.value) > 0)?.value || options[0]?.value || '');
+        }
+        function loadSeason() {
+            const season = Number($('season-number').value);
+            const assessment = title.seasonAssessments.find(item => item.season === season);
+            const reaction = assessment?.reaction || '';
+            $('season-reaction').replaceChildren(new Option('No assessment', ''));
+            for (const word of new Set([...reactionWords, ...(reaction ? [reaction] : [])])) $('season-reaction').append(new Option(word, word));
+            $('season-reaction').value = reaction; $('season-note').value = assessment?.note || '';
+            $('season-status').textContent = ''; requestId = stableRequest();
+        }
+        $('season-close').onclick = () => dialog.close();
+        dialog.onclose = () => {opening++;};
+        $('season-number').onchange = loadSeason;
+        $('season-form').oninput = () => {if (!pending) requestId = stableRequest();};
+        $('season-form').onsubmit = async event => {
+            event.preventDefault(); if (!title || !$('season-number').value) return;
+            const button = $('season-save'); button.disabled = true; button.textContent = 'Saving…';
+            pending ||= [{action:'edit_assessment', titleId:title.id, season:Number($('season-number').value), reaction:$('season-reaction').value, note:$('season-note').value, date:null}];
+            $('season-fields').disabled = true; $('season-close').disabled = true; dialog.oncancel = e => e.preventDefault();
+            try {
+                await save(pending, requestId);
+                title = (await api('title', {id:title.id})).title;
+                const savedSeason = pending[0].season, committedRequest = requestId; pending = null; renderSeasons(); loadSeason(); requestId = committedRequest;
+                $('season-status').textContent = `Season ${savedSeason} saved. Your overall reaction is unchanged.`;
+                $('season-fields').disabled = false;
+            } catch (failure) {
+                $('season-status').textContent = failure.message + ' Retry Save for this exact season, or close and reopen to review again.';
+            } finally {button.disabled = false; button.textContent = 'Save reaction'; $('season-close').disabled = false; dialog.oncancel = null;}
+        };
+        return async id => {
+            if (dialog.open) return;
+            const current = ++opening; title = null; pending = null; requestId = stableRequest();
+            $('season-show').textContent = ''; $('season-overall').textContent = ''; $('season-number').replaceChildren();
+            $('season-fields').disabled = true; $('season-save').disabled = true; $('season-status').textContent = 'Loading seasons…'; dialog.showModal();
+            try {
+                const result = (await api('title', {id})).title;
+                if (current !== opening || !dialog.open) return;
+                if (result.media_type !== 'tv' || result.viewing_status !== 'seen') throw new Error('Save this show to your library before rating its seasons.');
+                title = result;
+                $('season-show').textContent = title.title;
+                $('season-overall').textContent = `Overall: ${title.reaction || 'No assessment'}. Each season is independent.`;
+                renderSeasons();
+                if (!$('season-number').options.length) throw new Error('Season details are unavailable. Refresh metadata from the title page and try again.');
+                loadSeason(); $('season-fields').disabled = false; $('season-save').disabled = false;
+            } catch (failure) {if (current === opening && dialog.open) $('season-status').textContent = failure.message;}
+        };
+    }
+
     async function browseHistory() {
         const selected = new Map();
+        const editSeasons = seasonEditor();
         const dialog = $('backfill-dialog');
         const initialPage = Number(params.get('page'));
         let pageNumber = Number.isInteger(initialPage) && initialPage >= 1 && initialPage <= 500 ? initialPage : 1;
@@ -339,7 +400,12 @@
                 const card = el('article', undefined, 'backfill-card');
                 card.append(poster(title.poster, title.title, 'poster-cover'), el('h2', title.title, 'poster-name'), el('p', title.year || 'Year unknown', 'poster-year text-body-secondary'));
                 if (title.viewingStatus === 'seen') {
-                    card.append(link('Already in library', `/titles/${title.localId}`, 'small')); $('backfill-grid').append(card); continue;
+                    card.append(link('Already in library', `/titles/${title.localId}`, 'small d-block'));
+                    if (title.mediaType === 'tv') {
+                        const seasons = el('button', 'Season reactions', 'btn btn-link btn-sm p-0 mt-2'); seasons.type = 'button';
+                        seasons.onclick = () => editSeasons(title.localId); card.append(seasons);
+                    }
+                    $('backfill-grid').append(card); continue;
                 }
                 const label = el('label', undefined, 'form-check'); const check = el('input', undefined, 'form-check-input'); check.type = 'checkbox';
                 check.checked = selected.has(key(title)); label.append(check, el('span', 'Watched', 'form-check-label'));
