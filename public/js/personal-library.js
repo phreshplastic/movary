@@ -113,11 +113,11 @@
                 const detailPath = `/titles/${title.id}`;
                 const card = link('', detailPath, 'poster-card');
                 card.append(poster(title.metadata.poster, title.title, 'poster-cover'), el('div', title.title, 'poster-name'), el('div', `${title.release_year || 'Year unknown'} · ${title.media_type === 'tv' ? 'TV' : 'Movie'}`, 'poster-year text-body-secondary'));
-                card.append(el('div', title.reaction || (page === 'library' ? 'No reaction yet' : ''), 'poster-reaction'));
+                card.append(el('div', title.reaction || (page === 'library' ? 'No assessment' : ''), 'poster-reaction'));
                 $('collection-grid').append(card);
                 const row = el('tr');
                 const nameCell = el('td'); nameCell.append(link(title.title, detailPath, 'library-title'), el('span', title.release_year, 'text-body-secondary ms-2'));
-                row.append(nameCell, el('td', title.media_type === 'tv' ? 'TV' : 'Movie'), el('td', title.reaction || '—'), el('td', collectNames(title.metadata.genres) || '—', 'text-body-secondary'));
+                row.append(nameCell, el('td', title.media_type === 'tv' ? 'TV' : 'Movie'), el('td', title.reaction || 'No assessment'), el('td', collectNames(title.metadata.genres) || '—', 'text-body-secondary'));
                 $('collection-table').querySelector('tbody').append(row);
             }
             $('collection-count').textContent = `${total} ${total === 1 ? 'title' : 'titles'}`;
@@ -344,7 +344,7 @@
                 const label = el('label', undefined, 'form-check'); const check = el('input', undefined, 'form-check-input'); check.type = 'checkbox';
                 check.checked = selected.has(key(title)); label.append(check, el('span', 'Watched', 'form-check-label'));
                 const reaction = el('select', undefined, 'form-select form-select-sm mt-2'); reaction.setAttribute('aria-label', `Reaction to ${title.title}`);
-                reaction.append(new Option('No reaction yet', '')); reactionWords.forEach(word => reaction.append(new Option(word, word)));
+                reaction.append(new Option('No assessment', '')); reactionWords.forEach(word => reaction.append(new Option(word, word)));
                 if (title.existingReaction && !reactionWords.includes(title.existingReaction)) reaction.append(new Option(title.existingReaction, title.existingReaction));
                 reaction.value = selected.get(key(title))?.reaction ?? title.existingReaction ?? ''; reaction.disabled = !check.checked;
                 check.onchange = () => {if (check.checked && selected.size >= 100) {check.checked = false; error('Save this batch before selecting more than 100 titles.'); return;} reaction.disabled = !check.checked; if (check.checked) selected.set(key(title), {...title, reaction:reaction.value}); else selected.delete(key(title)); counter();};
@@ -368,7 +368,7 @@
         $('backfill-next').onclick = () => {pageNumber = nextPage || pageNumber; run(load);};
         $('backfill-review').onclick = () => {
             $('backfill-changes').replaceChildren(); $('backfill-receipt').textContent = '';
-            for (const title of selected.values()) $('backfill-changes').append(el('p', `${title.title} (${title.year || 'Year unknown'}) · Watched · ${title.reaction || 'No reaction'} · Unknown date`));
+            for (const title of selected.values()) $('backfill-changes').append(el('p', `${title.title} (${title.year || 'Year unknown'}) · Watched · ${title.reaction || 'No assessment'} · Unknown date`));
             requestId = stableRequest(); dialog.showModal();
         };
         function closeBatch() {
