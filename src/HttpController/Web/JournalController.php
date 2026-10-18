@@ -5,6 +5,7 @@ namespace Movary\HttpController\Web;
 use InvalidArgumentException;
 use Movary\Domain\User\Service\CurrentWebUser;
 use Movary\Service\Journal\JournalService;
+use Movary\Service\Journal\PersonalLibrary;
 use Movary\ValueObject\Http\Header;
 use Movary\ValueObject\Http\Request;
 use Movary\ValueObject\Http\Response;
@@ -17,6 +18,7 @@ class JournalController
         private readonly CurrentWebUser $currentUser,
         private readonly JournalService $journal,
         private readonly Environment $twig,
+        private readonly PersonalLibrary $library,
     ) {
     }
 
@@ -27,9 +29,65 @@ class JournalController
 
     public function library() : Response
     {
-        return Response::createSensitive(StatusCode::createOk(), $this->twig->render('page/library.html.twig', [
-            'journal' => $this->journal->context($this->currentUser->requireUser()->getId()),
+        return Response::createSensitive(StatusCode::createOk(), $this->twig->render('page/personal-library.html.twig', ['screen' => 'library', 'titleId' => '']));
+    }
+
+    public function page(Request $request) : Response
+    {
+        $parameters = $request->getRouteParameters();
+        return Response::createSensitive(StatusCode::createOk(), $this->twig->render('page/personal-library.html.twig', [
+            'screen' => $parameters['screen'] ?? (isset($parameters['id']) ? 'title' : 'log-watch'), 'titleId' => $parameters['id'] ?? '',
         ]));
+    }
+
+    public function libraryAction(Request $request) : Response
+    {
+        try {
+            $input = json_decode($request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+            if (is_array($input) === false) {
+                throw new InvalidArgumentException('Expected a library request.');
+            }
+            $result = $this->executeLibrary($this->currentUser->requireUser()->getId(), $request->getRouteParameters()['action'], $input);
+            return Response::createSensitiveJson(json_encode($result, JSON_THROW_ON_ERROR));
+        } catch (InvalidArgumentException | \JsonException $e) {
+            return Response::createSensitiveJson(json_encode(['error' => $e->getMessage()], JSON_THROW_ON_ERROR), StatusCode::createBadRequest());
+        } catch (\Throwable) {
+            return Response::createSensitiveJson('{"error":"The operation could not finish. Your existing library is available; retry the same Save to recover its receipt."}', StatusCode::createBadRequest());
+        }
+    }
+
+    /** @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    private function executeLibrary(int $userId, string $action, array $input) : array
+    {
+        $input += ['id' => '', 'creditsOffset' => 0, 'limit' => 25, 'offset' => 0, 'query' => '', 'mediaType' => 'all', 'page' => 1, 'changes' => [], 'requestId' => null, 'approval' => '', 'tasteOffset' => 0, 'fullStatements' => false, 'tmdbId' => 0];
+        if (in_array($action, ['preview', 'commit', 'refresh'], true)) {
+            return $this->mutateLibrary($userId, $action, $input);
+        }
+        return match ($action) {
+            'context' => $this->library->context($userId, (int)$input['tasteOffset'], (bool)$input['fullStatements']),
+            'search' => $this->library->search($userId, $input),
+            'facets' => ['items' => $this->library->facets($userId)],
+            'title' => $this->library->title($userId, (string)$input['id'], (int)$input['creditsOffset']),
+            'history' => $this->library->history($userId, (string)$input['id'], (int)$input['limit'], (int)$input['offset']),
+            'catalog' => $this->library->catalog($userId, (string)$input['query'], (string)$input['mediaType'], (int)$input['page']),
+            'catalog-title' => ['metadata' => $this->library->catalogTitle((string)$input['mediaType'], (int)$input['tmdbId'])],
+            default => throw new InvalidArgumentException('Unknown library operation.'),
+        };
+    }
+
+    /** @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    private function mutateLibrary(int $userId, string $action, array $input) : array
+    {
+        return match ($action) {
+            'preview' => $this->library->preview($userId, array_values((array)$input['changes']), $input['requestId']),
+            'commit' => $this->library->commit($userId, (string)$input['id'], (string)$input['approval']),
+            'refresh' => $this->library->refresh($userId, (string)$input['id']),
+            default => throw new InvalidArgumentException('Unknown personal mutation.'),
+        };
     }
 
     public function render() : Response
@@ -77,6 +135,6 @@ class JournalController
 
         return Response::createSensitive(StatusCode::createOk(),
             $this->journal->export($this->currentUser->requireUser()->getId(), $format),
-            [Header::createAttachment($format === 'csv' ? 'watch-history.csv' : 'movie-context.md')]);
+            [Header::createAttachment($format === 'csv' ? 'watch-history.csv' : ($format === 'json' ? 'library-v1.json' : 'movie-context.md'))]);
     }
 }

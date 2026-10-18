@@ -12,6 +12,11 @@ class RouterService
     {
         foreach ($routeList as $route) {
             $middleware = $route->getMiddleware();
+            if (in_array($route->getMethod(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)
+                && \Movary\Service\Journal\JournalNativeWriteGuard::protects($route->getHandler())
+            ) {
+                $middleware[] = \Movary\Service\Journal\JournalNativeWriteGuard::class;
+            }
             if ($isWebRoute === true) {
                 if (in_array($route->getMethod(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)
                     && $route->isCsrfProtectionEnabled() === true

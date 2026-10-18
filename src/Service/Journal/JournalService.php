@@ -27,12 +27,18 @@ class JournalService
         private readonly SyncMovie $syncMovie,
         private readonly Connection $db,
         private readonly Config $config,
+        private readonly ?PersonalLibrary $library = null,
+        private readonly ?LibraryCompatibility $compatibility = null,
     ) {
     }
 
     /** @return array{version:string,films:list<Film>,shows:list<Film>,taste:string} */
     public function context(int $userId) : array
     {
+        $compatibility = $this->activeLibrary($userId);
+        if ($compatibility !== null) {
+            return $compatibility->context($userId);
+        }
         $markdown = $this->store->read($userId, 'WATCH_HISTORY.md');
 
         return ['version' => hash('sha256', $markdown), 'films' => $this->document->read($markdown),
@@ -42,6 +48,10 @@ class JournalService
     /** @return array<string,mixed> */
     public function preview(int $userId, string $text, string $mediaType = 'movie') : array
     {
+        $compatibility = $this->activeLibrary($userId);
+        if ($compatibility !== null) {
+            return $compatibility->preview($userId, $text, $mediaType);
+        }
         if (in_array($mediaType, ['movie', 'tv'], true) === false) {
             throw new InvalidArgumentException('Choose Movies or TV shows.');
         }
@@ -68,6 +78,19 @@ class JournalService
      * @return array<string,mixed>
      */
     public function review(int $userId, string $id, array $choices, array $details = []) : array
+    {
+        $compatibility = $this->activeLibrary($userId);
+        if ($compatibility !== null) {
+            return $compatibility->review($userId, $id, $choices, $details);
+        }
+        return $this->legacyReview($userId, $id, $choices, $details);
+    }
+
+    /** @param array<array-key,mixed> $choices
+     * @param array<array-key,mixed> $details
+     * @return array<string,mixed>
+     */
+    private function legacyReview(int $userId, string $id, array $choices, array $details) : array
     {
         $draft = $this->store->draft($userId, $id);
         $markdown = $this->store->read($userId, 'WATCH_HISTORY.md');
@@ -114,6 +137,10 @@ class JournalService
     /** @return array<string,mixed> */
     public function commit(int $userId, string $id, string $approval) : array
     {
+        $compatibility = $this->activeLibrary($userId);
+        if ($compatibility !== null) {
+            return $compatibility->commit($userId, $id, $approval);
+        }
         return $this->store->locked($userId, function () use ($userId, $id, $approval) : array {
             $draft = $this->store->draft($userId, $id);
             if (isset($draft['approval']) === false || hash_equals($draft['approval'], $approval) === false) {
@@ -231,6 +258,10 @@ class JournalService
 
     public function export(int $userId, string $format) : string
     {
+        $compatibility = $this->activeLibrary($userId);
+        if ($compatibility !== null) {
+            return $compatibility->export($userId, $format);
+        }
         $markdown = $this->store->read($userId, 'WATCH_HISTORY.md');
         if ($format === 'context') {
             return "# Private watched library context\n\nOnly Seen confirms viewing. Preserve reaction words; blank dates are unknown.\n\n"
@@ -340,5 +371,9 @@ class JournalService
         chmod($targetPath, 0600);
 
         return $name;
+    }
+    private function activeLibrary(int $userId) : ?LibraryCompatibility
+    {
+        return $this->library?->ready($userId) === true ? $this->compatibility : null;
     }
 }

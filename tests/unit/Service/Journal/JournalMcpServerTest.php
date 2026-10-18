@@ -73,4 +73,21 @@ class JournalMcpServerTest extends TestCase
 
         self::assertFalse(($response['result']['isError'] ?? null));
     }
+    public function testVersionedSearchDefaultsToBothMediaTypes() : void
+    {
+        $library = $this->createMock(\Movary\Service\Journal\PersonalLibrary::class);
+        $library->expects(self::once())->method('search')->with(7, self::callback(static fn(array $filters) : bool => $filters['mediaType'] === 'all'))->willReturn(['items' => []]);
+        $server = new JournalMcpServer($this->createStub(JournalService::class), $library);
+        $response = $server->handle(7, false, ['id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'search_library', 'arguments' => []]]);
+        self::assertFalse($response['result']['isError'] ?? null);
+    }
+
+    public function testVersionedWritesAreUnavailableOnReadOnlyConnections() : void
+    {
+        $library = $this->createMock(\Movary\Service\Journal\PersonalLibrary::class);
+        $library->expects(self::never())->method('commit');
+        $server = new JournalMcpServer($this->createStub(JournalService::class), $library);
+        $response = $server->handle(7, false, ['id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'commit_changes', 'arguments' => ['id' => 'review', 'approval' => 'token']]]);
+        self::assertSame(-32602, $response['error']['code'] ?? null);
+    }
 }

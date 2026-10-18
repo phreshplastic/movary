@@ -36,7 +36,7 @@
             const label = text(row, 'label', `${item.input.title}${item.input.year ? ` (${item.input.year})` : ''}`); label.htmlFor = `match-${index}`; label.className = 'form-label';
             const select = document.createElement('select'); select.id = `match-${index}`; select.dataset.index = index; select.className = 'form-select';
             const empty = document.createElement('option'); empty.value = ''; empty.textContent = 'Choose the correct title…'; select.append(empty);
-            item.candidates.forEach(candidate => { const option = document.createElement('option'); option.value = candidate.id; option.textContent = `${candidate.title} (${candidate.year || 'year unknown'}) · ${candidate.language} · TMDB ${candidate.id}`; select.append(option); });
+            item.candidates.forEach(candidate => { const option = document.createElement('option'); option.value = candidate.id; option.textContent = `${candidate.title} (${candidate.year || 'year unknown'}) · TMDB ${candidate.id}`; select.append(option); });
             const skip = document.createElement('option'); skip.value = 'skip'; skip.textContent = 'Skip this title for now'; select.append(skip);
             if (item.selected) select.value = item.selected;
             row.append(select);
@@ -57,7 +57,7 @@
     }));
     byId('review-changes').addEventListener('click', () => run('Preparing your preview…', async () => {
         const choices = {};
-        document.querySelectorAll('#matches select').forEach(select => { if (!select.value) throw new Error('Choose a movie or skip each unresolved title.'); choices[select.dataset.index] = select.value; });
+        document.querySelectorAll('#matches select').forEach(select => { if (!select.value) throw new Error('Choose a title version or skip each unresolved match.'); choices[select.dataset.index] = select.value; });
         const details = {};
         document.querySelectorAll('#matches input[data-field]').forEach(input => { (details[input.dataset.row] ||= {})[input.dataset.field] = input.value; });
         review = await request('review', {id: draft.id, choices, details});
@@ -70,7 +70,7 @@
             if (change.before && change.before.reaction !== after.reaction) text(row, 'p', `Reaction changes from “${change.before.reaction || 'none'}” to “${after.reaction || 'none'}”.`);
             if (change.before && change.before.status !== after.status) text(row, 'p', `Mark as watched (previously ${change.before.status}), based on your confirmation.`);
             if (after.note && (!change.before || change.before.note !== after.note)) text(row, 'p', `Note: ${after.note}`);
-            text(row, 'p', change.play === 'library-only' ? 'TV show: save to library; no season or episode completion is inferred.' : (change.play === 'add' ? 'Record one movie watch.' : 'Already watched; keep existing plays.'));
+            text(row, 'p', change.play === 'personal-library-only' ? 'Confirm historical viewing evidence, preserving the lifetime watch count as unknown.' : change.play === 'library-only' ? 'TV show: save to library; no season or episode completion is inferred.' : (change.play === 'add' ? 'Record one movie watch.' : 'Already watched; keep existing plays.'));
         });
         show('review');
     }));

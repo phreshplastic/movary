@@ -7,6 +7,8 @@ require_once(__DIR__ . '/vendor/autoload.php');
 $builder = new DI\ContainerBuilder();
 $builder->addDefinitions(
     [
+        \Movary\Service\Journal\JournalService::class => DI\autowire()->constructorParameter('library', DI\get(\Movary\Service\Journal\PersonalLibrary::class))->constructorParameter('compatibility', DI\get(\Movary\Service\Journal\LibraryCompatibility::class)),
+        \Movary\Service\Journal\JournalMcpServer::class => DI\autowire()->constructorParameter('library', DI\get(\Movary\Service\Journal\PersonalLibrary::class)),
         \Movary\ValueObject\Config::class => DI\factory([Factory::class, 'createConfig']),
         \Movary\Service\ApplicationSecret::class => DI\factory([Factory::class, 'createApplicationSecret']),
         \Movary\Api\Trakt\TraktApi::class => DI\factory([Factory::class, 'createTraktApi']),
