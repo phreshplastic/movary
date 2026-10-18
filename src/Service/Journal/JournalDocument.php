@@ -86,6 +86,13 @@ class JournalDocument
     /** @return Film */
     private function parseLine(string $line) : array
     {
+        if (preg_match('/^(.+?)\s+\((\d{4}|Year unknown)\) · Watched · (.*) · ([^·]+)$/u', $line, $review) === 1) {
+            $date = $review[4] === 'Unknown date' ? '' : $review[4];
+            $this->validateDate($date);
+
+            return ['title' => $review[1], 'year' => $review[2] === 'Year unknown' ? '' : $review[2], 'status' => 'Seen',
+                'reaction' => $review[3] === 'No assessment' ? '' : $review[3], 'date' => $date, 'note' => ''];
+        }
         $cells = array_map('trim', preg_split('/[|\t]/', $line) ?: []);
         if (count($cells) > 4) {
             throw new InvalidArgumentException('Use one title per line, optionally followed by reaction, date, and note.');

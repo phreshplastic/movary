@@ -7,7 +7,7 @@
     const panels = ['paste', 'matches', 'review', 'saved'];
     const show = name => {
         panels.forEach(panel => { byId(`${panel}-panel`).hidden = panel !== name; });
-        const labels = {paste: ['Paste titles', 'One title per line. Add reactions, dates, and notes after matching.'], matches: ['Review matches', 'Choose the right version and add any details you remember.'], review: ['Review changes', 'Check these changes before saving.'], saved: ['Saved to your library', '']};
+        const labels = {paste: ['Paste titles', 'Paste one title per line, or paste your selection from Browse titles. Review the matches before saving.'], matches: ['Review matches', 'Choose the right version and add any details you remember.'], review: ['Review changes', 'Check these changes before saving.'], saved: ['Saved to your library', '']};
         [byId('intake-title').textContent, byId('step-description').textContent] = labels[name];
         byId('journal-status').textContent = '';
     };
@@ -66,7 +66,7 @@
             const row = text(byId('changes'), 'section', ''); row.className = 'journal-change';
             text(row, 'h3', `${change.after.title} (${change.after.year || '?'})`).className = 'h6';
             const after = change.after;
-            text(row, 'p', `${change.before ? 'Update existing title' : 'Add to library'} · ${after.reaction || 'No reaction'} · ${after.date || 'Unknown watch date'}`);
+            text(row, 'p', `${change.before ? 'Update existing title' : 'Add to library'} · ${after.reaction || 'No assessment'} · ${after.date || 'Unknown watch date'}`);
             if (change.before && change.before.reaction !== after.reaction) text(row, 'p', `Reaction changes from “${change.before.reaction || 'none'}” to “${after.reaction || 'none'}”.`);
             if (change.before && change.before.status !== after.status) text(row, 'p', `Mark as watched (previously ${change.before.status}), based on your confirmation.`);
             if (after.note && (!change.before || change.before.note !== after.note)) text(row, 'p', `Note: ${after.note}`);

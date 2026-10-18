@@ -1,5 +1,5 @@
 {% extends 'base.html.twig' %}
-{% block title %}{{ screen == 'log-watch' ? 'Add' : (screen == 'watchlist' ? 'Wishlist' : (screen == 'browse-history' ? 'Browse history' : screen|capitalize)) }}{% endblock %}
+{% block title %}{{ screen == 'log-watch' ? 'Add' : (screen == 'watchlist' ? 'Wishlist' : (screen == 'browse-history' ? 'Browse titles' : screen|capitalize)) }}{% endblock %}
 {% block scripts %}<script src="{{ asset_url('js/personal-library.js') }}"></script>{% endblock %}
 {% block body %}
 <main class="container personal-library" data-screen="{{ screen }}" data-title-id="{{ titleId }}">
@@ -30,7 +30,7 @@
     <div id="collection-empty" class="empty-collection" hidden><h2>No titles here yet</h2><p class="text-body-secondary">Try another filter or add a title.</p><a class="btn btn-primary" href="{{ applicationUrl }}/log-watch">Find a title</a></div>
     <nav class="collection-pagination" aria-label="Collection pages"><button class="btn btn-outline-secondary" id="page-previous">Previous</button><span id="page-label" class="text-body-secondary small"></span><button class="btn btn-outline-secondary" id="page-next">Next</button></nav>
     {% elseif screen == 'log-watch' %}
-    <div class="quick-log"><header class="collection-heading"><h1 id="log-heading">Add</h1><a href="{{ applicationUrl }}/browse-history" class="small">Browse history</a></header>
+    <div class="quick-log"><header class="collection-heading"><h1 id="log-heading">Add</h1><a href="{{ applicationUrl }}/browse-history" class="small">Browse titles</a></header>
     <form id="catalog-search" class="catalog-search"><label class="flex-grow-1"><span class="visually-hidden">Movie or TV title</span><input id="catalog-query" type="search" class="form-control" placeholder="Search for a movie or TV show" required minlength="2" maxlength="200" autocomplete="off"></label><label><span class="visually-hidden">Search type</span><select class="form-select" id="catalog-type"><option value="all">Movies &amp; TV</option><option value="movie">Movies</option><option value="tv">TV</option></select></label><button class="btn btn-outline-secondary">Search</button></form>
     <div id="catalog-results" class="catalog-results" aria-live="polite"></div><button id="catalog-more" class="btn btn-outline-secondary mt-3" hidden>More matches</button>
     <form id="watch-form" hidden>
@@ -48,7 +48,7 @@
         <p id="watch-review" class="log-review text-body-secondary"></p><button id="watch-save" class="btn btn-primary" type="submit">Save</button><button id="watch-cancel" class="btn btn-link" type="button">Choose another title</button>
     </form><div id="log-success" role="status" class="alert alert-success" hidden></div></div>
     {% elseif screen == 'browse-history' %}
-    <header class="collection-heading"><h1>Browse history</h1><a class="small" href="{{ applicationUrl }}/import-history">Paste titles instead</a></header>
+    <header class="collection-heading"><h1>Browse titles</h1><a class="small" href="{{ applicationUrl }}/import-history">Paste titles instead</a></header>
     <p class="text-body-secondary">Spot something you’ve watched? Mark it and optionally add a reaction. Review before saving; dates stay unknown. Skipped titles stay unknown.</p>
     <form id="backfill-filters" class="collection-filters"><label><span class="visually-hidden">Type</span><select name="mediaType" class="form-select"><option value="movie">Movies</option><option value="tv">TV shows</option></select></label><label><span class="visually-hidden">Browse list</span><select name="list" class="form-select"><option value="top_rated">Highly rated</option><option value="popular">Popular</option></select></label><button id="backfill-review" type="button" class="btn btn-primary ms-auto" disabled>Review selected</button></form>
     <p class="small text-body-secondary" id="backfill-status" role="status">Loading titles…</p><div id="backfill-grid" class="poster-grid backfill-grid"></div>

@@ -19,6 +19,31 @@ class JournalDocumentTest extends TestCase
         self::assertSame('Seen', $films[0]['status']);
     }
 
+    public function testBrowseReviewTextPreservesWatchedDetails() : void
+    {
+        $films = (new JournalDocument())->parse("Example: Series (2022) · Watched · Loved · Unknown date\nAnother Show (2000) · Watched · No assessment · Unknown date\nA Film (1995) · Watched · Liked · 2020-02-29");
+
+        self::assertSame(['title' => 'Example: Series', 'year' => '2022', 'status' => 'Seen', 'reaction' => 'Loved', 'date' => '', 'note' => ''], $films[0]);
+        self::assertSame('', $films[1]['reaction']);
+        self::assertSame('', $films[1]['date']);
+        self::assertSame('2020-02-29', $films[2]['date']);
+    }
+
+    public function testBrowseReviewSupportsUnknownYearAndLiteralSeparators() : void
+    {
+        $film = (new JournalDocument())->parse('Part · Two (Year unknown) · Watched · Loved | funny · vivid · Unknown date')[0];
+
+        self::assertSame('Part · Two', $film['title']);
+        self::assertSame('', $film['year']);
+        self::assertSame('Loved | funny · vivid', $film['reaction']);
+    }
+
+    public function testBrowseReviewStillValidatesCalendarDates() : void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        (new JournalDocument())->parse('A Show (2020) · Watched · Okay · 2026-02-30');
+    }
+
     public function testInvalidCalendarDateIsRejected() : void
     {
         $this->expectException(InvalidArgumentException::class);
