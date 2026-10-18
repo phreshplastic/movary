@@ -373,7 +373,7 @@ main.container > div:has(> .nav-pills) .form-select { padding-inline-end: 2.25re
 [hidden] { display:none !important; }
 @media (min-width:1200px) { .poster-grid { grid-template-columns:repeat(6,minmax(0,1fr)); } }
 @media (max-width:767px) {
-    .personal-library { padding-bottom:6rem; }
+    main.personal-library { padding-bottom:calc(6rem + env(safe-area-inset-bottom)); }
     .app-navbar .container { flex-wrap:nowrap; }
     .library-navigation { position:fixed; z-index:1020; bottom:0; left:0; right:0; height:64px; padding-bottom:env(safe-area-inset-bottom); margin:0; justify-content:space-around; background:var(--bs-body-bg); border-top:1px solid var(--bs-border-color); gap:0; }
     .library-navigation a { text-align:center; padding:1.1rem .5rem; flex:1; font-size:.85rem; }
