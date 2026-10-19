@@ -150,3 +150,7 @@ implementing it outright.
   guessing (see `README.md` Support section for community channels).
 - If a fix requires touching many files or changing established architecture, stop and
   propose a plan first instead of executing a large autonomous rewrite.
+
+## Personal-library fork
+
+This private fork's approved design makes the structured `journal_*` tables in the existing SQLite database authoritative for personal context. Read `docs/user-guide/movie-journal.md` before changing intake, metadata, exports, or MCP. `PersonalLibrary` owns reviewed writes, personal revisions, audit history, scoped TV responses, and idempotent receipts. Legacy journal/MCP aliases are adapters; original Markdown is retained as migration evidence and exports are generated. Native Movary personal writes are read-only for migrated owners. Metadata refreshes must preserve personal words, states, and revisions. Historical Seen evidence does not establish a lifetime watch count; catalog/interest/taste mentions never establish a watch.

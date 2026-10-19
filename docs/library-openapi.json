@@ -1,0 +1,783 @@
+{
+  "openapi": "3.0.2",
+  "info": {
+    "title": "Private personal-library browser API",
+    "version": "1.0",
+    "description": "Same-origin browser adapter for the shared personal-record service. Existing web login and CSRF are required, including read POSTs. MCP uses the STDIO adapter, not an unauthenticated HTTP endpoint."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/library-api/context": {
+      "post": {
+        "summary": "Context",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tasteOffset": {
+                    "type": "integer"
+                  },
+                  "fullStatements": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Versioned personal-library result. Search and history use total, limit, offset, nextOffset, and items; title credits and taste have separate pagination. Preview returns exact changes, id, revision, and approval; commit returns the durable receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Sign-in required"
+          },
+          "400": {
+            "description": "Invalid, expired, stale, or temporarily unavailable operation; personal records are preserved"
+          },
+          "403": {
+            "description": "Invalid CSRF token"
+          }
+        }
+      }
+    },
+    "/library-api/search": {
+      "post": {
+        "summary": "Search",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string"
+                  },
+                  "mediaType": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "interest": {
+                    "type": "string"
+                  },
+                  "reaction": {
+                    "type": "string"
+                  },
+                  "genre": {
+                    "type": "string"
+                  },
+                  "person": {
+                    "type": "string"
+                  },
+                  "language": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "keyword": {
+                    "type": "string"
+                  },
+                  "year": {
+                    "type": "string"
+                  },
+                  "sort": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 25
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "default": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Versioned personal-library result. Search and history use total, limit, offset, nextOffset, and items; title credits and taste have separate pagination. Preview returns exact changes, id, revision, and approval; commit returns the durable receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Sign-in required"
+          },
+          "400": {
+            "description": "Invalid, expired, stale, or temporarily unavailable operation; personal records are preserved"
+          },
+          "403": {
+            "description": "Invalid CSRF token"
+          }
+        }
+      }
+    },
+    "/library-api/facets": {
+      "post": {
+        "summary": "Facets",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Versioned personal-library result. Search and history use total, limit, offset, nextOffset, and items; title credits and taste have separate pagination. Preview returns exact changes, id, revision, and approval; commit returns the durable receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Sign-in required"
+          },
+          "400": {
+            "description": "Invalid, expired, stale, or temporarily unavailable operation; personal records are preserved"
+          },
+          "403": {
+            "description": "Invalid CSRF token"
+          }
+        }
+      }
+    },
+    "/library-api/title": {
+      "post": {
+        "summary": "Title",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "creditsOffset": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Versioned personal-library result. Search and history use total, limit, offset, nextOffset, and items; title credits and taste have separate pagination. Preview returns exact changes, id, revision, and approval; commit returns the durable receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Sign-in required"
+          },
+          "400": {
+            "description": "Invalid, expired, stale, or temporarily unavailable operation; personal records are preserved"
+          },
+          "403": {
+            "description": "Invalid CSRF token"
+          }
+        }
+      }
+    },
+    "/library-api/history": {
+      "post": {
+        "summary": "History",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "integer"
+                  },
+                  "offset": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Versioned personal-library result. Search and history use total, limit, offset, nextOffset, and items; title credits and taste have separate pagination. Preview returns exact changes, id, revision, and approval; commit returns the durable receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Sign-in required"
+          },
+          "400": {
+            "description": "Invalid, expired, stale, or temporarily unavailable operation; personal records are preserved"
+          },
+          "403": {
+            "description": "Invalid CSRF token"
+          }
+        }
+      }
+    },
+    "/library-api/catalog": {
+      "post": {
+        "summary": "Catalog",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string"
+                  },
+                  "mediaType": {
+                    "type": "string"
+                  },
+                  "page": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "query"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Versioned personal-library result. Search and history use total, limit, offset, nextOffset, and items; title credits and taste have separate pagination. Preview returns exact changes, id, revision, and approval; commit returns the durable receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Sign-in required"
+          },
+          "400": {
+            "description": "Invalid, expired, stale, or temporarily unavailable operation; personal records are preserved"
+          },
+          "403": {
+            "description": "Invalid CSRF token"
+          }
+        }
+      }
+    },
+    "/library-api/catalog-title": {
+      "post": {
+        "summary": "Catalog Title",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mediaType": {
+                    "type": "string"
+                  },
+                  "tmdbId": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "mediaType",
+                  "tmdbId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Versioned personal-library result. Search and history use total, limit, offset, nextOffset, and items; title credits and taste have separate pagination. Preview returns exact changes, id, revision, and approval; commit returns the durable receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Sign-in required"
+          },
+          "400": {
+            "description": "Invalid, expired, stale, or temporarily unavailable operation; personal records are preserved"
+          },
+          "403": {
+            "description": "Invalid CSRF token"
+          }
+        }
+      }
+    },
+    "/library-api/preview": {
+      "post": {
+        "summary": "Preview",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "changes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "$ref": "#/components/schemas/PersonalChange"
+                    }
+                  },
+                  "requestId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "changes"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Versioned personal-library result. Search and history use total, limit, offset, nextOffset, and items; title credits and taste have separate pagination. Preview returns exact changes, id, revision, and approval; commit returns the durable receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Sign-in required"
+          },
+          "400": {
+            "description": "Invalid, expired, stale, or temporarily unavailable operation; personal records are preserved"
+          },
+          "403": {
+            "description": "Invalid CSRF token"
+          }
+        }
+      }
+    },
+    "/library-api/commit": {
+      "post": {
+        "summary": "Commit",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "approval": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "approval"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Versioned personal-library result. Search and history use total, limit, offset, nextOffset, and items; title credits and taste have separate pagination. Preview returns exact changes, id, revision, and approval; commit returns the durable receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Sign-in required"
+          },
+          "400": {
+            "description": "Invalid, expired, stale, or temporarily unavailable operation; personal records are preserved"
+          },
+          "403": {
+            "description": "Invalid CSRF token"
+          }
+        }
+      }
+    },
+    "/library-api/refresh": {
+      "post": {
+        "summary": "Refresh",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Versioned personal-library result. Search and history use total, limit, offset, nextOffset, and items; title credits and taste have separate pagination. Preview returns exact changes, id, revision, and approval; commit returns the durable receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Sign-in required"
+          },
+          "400": {
+            "description": "Invalid, expired, stale, or temporarily unavailable operation; personal records are preserved"
+          },
+          "403": {
+            "description": "Invalid CSRF token"
+          }
+        }
+      }
+    },
+    "/library-api/browse": {
+      "post": {
+        "summary": "Browse catalog for historical recall (read-only)",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mediaType": {
+                    "type": "string",
+                    "enum": [
+                      "movie",
+                      "tv"
+                    ],
+                    "default": "movie"
+                  },
+                  "list": {
+                    "type": "string",
+                    "enum": [
+                      "top_rated",
+                      "popular"
+                    ],
+                    "default": "top_rated"
+                  },
+                  "page": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500,
+                    "default": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Versioned personal-library result. Search and history use total, limit, offset, nextOffset, and items; title credits and taste have separate pagination. Preview returns exact changes, id, revision, and approval; commit returns the durable receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Sign-in required"
+          },
+          "400": {
+            "description": "Invalid, expired, stale, or temporarily unavailable operation; personal records are preserved"
+          },
+          "403": {
+            "description": "Invalid CSRF token"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "webSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "id"
+      },
+      "csrfCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "csrf"
+      }
+    },
+    "schemas": {
+      "PersonalChange": {
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "log_watch",
+              "edit_assessment",
+              "confirm_seen",
+              "set_interest",
+              "set_status",
+              "set_progress",
+              "resolve_identity",
+              "save_taste"
+            ]
+          },
+          "titleId": {
+            "type": "string"
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "reaction": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "interest": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "string"
+          },
+          "tasteId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "tmdbId": {
+            "type": "integer"
+          },
+          "date": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "season": {
+            "type": "integer",
+            "nullable": true
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "security": [
+    {
+      "webSession": [],
+      "csrfCookie": []
+    }
+  ]
+}

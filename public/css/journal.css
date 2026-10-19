@@ -1,0 +1,19 @@
+#recall {
+    min-height: 12rem;
+}
+
+.journal-match,
+.journal-change {
+    border-bottom: 1px solid var(--bs-border-color);
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+}
+
+.journal-match p,
+.journal-change p {
+    margin: 0.5rem 0;
+}
+
+#journal-status:empty {
+    display: none;
+}

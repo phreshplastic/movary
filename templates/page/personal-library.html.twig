@@ -1,0 +1,73 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ screen == 'log-watch' ? 'Add' : (screen == 'watchlist' ? 'Wishlist' : (screen == 'browse-history' ? 'Browse titles' : screen|capitalize)) }}{% endblock %}
+{% block scripts %}<script src="{{ asset_url('js/personal-library.js') }}"></script>{% endblock %}
+{% block body %}
+<main class="container personal-library" data-screen="{{ screen }}" data-title-id="{{ titleId }}">
+    {{ include('component/navbar.html.twig') }}
+    <div id="library-alert" role="alert" class="alert alert-danger" hidden></div>
+    {% if screen in ['library', 'watchlist'] %}
+    <header class="collection-heading"><h1 id="collection-heading">{{ screen == 'watchlist' ? 'Wishlist' : 'Library' }}</h1><div class="btn-group" role="group" aria-label="Collection view"><button class="btn btn-outline-secondary" id="view-grid" aria-label="Poster grid">Grid</button><button class="btn btn-outline-secondary" id="view-table" aria-label="Table">Table</button></div></header>
+    <p id="collection-description" class="text-body-secondary">{{ screen == 'watchlist' ? 'Movies and shows you want to watch.' : 'Movies and shows you’ve watched.' }}</p>
+    {% if screen == 'watchlist' %}<div class="collection-tabs"><a id="interest-alternate" href="{{ applicationUrl }}/watchlist?interest=not_interested">Not interested</a><a class="btn btn-outline-secondary ms-auto" href="{{ applicationUrl }}/log-watch?action=set_interest">Add to wishlist</a></div>{% endif %}
+    <form id="collection-filters" class="collection-filters" role="search">
+        <label class="collection-search"><span class="visually-hidden">Search library</span><input class="form-control" name="query" type="search" placeholder="Search titles, people, or your notes"></label>
+        <label><span class="visually-hidden">Type</span><select class="form-select" name="mediaType"><option value="all">Movies &amp; TV</option><option value="movie">Movies</option><option value="tv">TV shows</option></select></label>
+        <input type="hidden" name="status" value="{{ screen == 'library' ? 'seen' : 'all' }}">
+        <button type="button" class="btn btn-outline-secondary" id="more-filters" aria-expanded="false" aria-controls="collection-extra">Filters</button>
+        <label><span class="visually-hidden">Sort</span><select name="sort" class="form-select"><option value="title">Title A–Z</option><option value="year">Newest release</option><option value="recent">Recently updated</option></select></label>
+        <div id="collection-extra" class="collection-extra" hidden>
+            <label>Reaction<select class="form-select" name="reaction"><option value="">Any reaction</option></select></label>
+            <label>Genre<select class="form-select" name="genre"><option value="">Any genre</option></select></label>
+            <label>Filmmaker / person<select class="form-select" name="person"><option value="">Anyone</option></select></label>
+            <label>Language<select class="form-select" name="language"><option value="">Any language</option></select></label>
+            <label>Year<input class="form-control" name="year" inputmode="numeric" placeholder="Any year" maxlength="4"></label>
+            <button type="reset" class="btn btn-link">Reset filters</button>
+        </div>
+    </form>
+    <p id="collection-count" class="small text-body-secondary" role="status">Loading library…</p>
+    <div id="collection-grid" class="poster-grid"></div>
+    <div id="collection-table" class="table-responsive library-table-wrap" hidden><table class="table mb-0"><thead><tr><th>Title</th><th>Type</th><th>Reaction</th><th>Genres</th></tr></thead><tbody></tbody></table></div>
+    <div id="collection-empty" class="empty-collection" hidden><h2>No titles here yet</h2><p class="text-body-secondary">Try another filter or add a title.</p><a class="btn btn-primary" href="{{ applicationUrl }}/log-watch">Find a title</a></div>
+    <nav class="collection-pagination" aria-label="Collection pages"><button class="btn btn-outline-secondary" id="page-previous">Previous</button><span id="page-label" class="text-body-secondary small"></span><button class="btn btn-outline-secondary" id="page-next">Next</button></nav>
+    {% elseif screen == 'log-watch' %}
+    <div class="quick-log"><header class="collection-heading"><h1 id="log-heading">Add</h1><a href="{{ applicationUrl }}/browse-history" class="small">Browse titles</a></header>
+    <form id="catalog-search" class="catalog-search"><label class="flex-grow-1"><span class="visually-hidden">Movie or TV title</span><input id="catalog-query" type="search" class="form-control" placeholder="Search for a movie or TV show" required minlength="2" maxlength="200" autocomplete="off"></label><label><span class="visually-hidden">Search type</span><select class="form-select" id="catalog-type"><option value="all">Movies &amp; TV</option><option value="movie">Movies</option><option value="tv">TV</option></select></label><button class="btn btn-outline-secondary">Search</button></form>
+    <div id="catalog-results" class="catalog-results" aria-live="polite"></div><button id="catalog-more" class="btn btn-outline-secondary mt-3" hidden>More matches</button>
+    <form id="watch-form" hidden>
+        <div id="selected-title" class="selected-title"></div>
+        <p id="existing-context" class="small text-body-secondary"></p>
+        <div id="log-mode" class="mb-4"><label for="watch-action" class="form-label">What would you like to do?</label><select id="watch-action" class="form-select"><option value="log_watch">Add this viewing</option><option value="edit_assessment">Edit reactions</option><option value="set_interest">Save to a list — no viewing</option><option value="set_progress">Update TV progress</option></select></div>
+        <div id="watch-details">
+            <div class="mb-4"><label class="form-label" for="watch-reaction">Your reaction <span class="text-body-secondary">(optional)</span></label><select id="watch-reaction" class="form-select"><option value="">No assessment</option>{% for word in ['Loved','Liked','Okay','Disliked','Strongly disliked'] %}<option>{{ word }}</option>{% endfor %}</select></div>
+            <div class="mb-4"><label class="form-label" for="watch-note">Anything to remember? <span class="text-body-secondary">(optional)</span></label><textarea id="watch-note" class="form-control" rows="3" maxlength="10000" placeholder="What worked, what didn't, or why it stayed with you"></textarea></div>
+            <div id="date-field" class="mb-4"><label class="form-label" for="watch-date">Watch date</label><div class="date-choice"><input id="watch-date" class="form-control" type="date"><label class="form-check"><input class="form-check-input" type="checkbox" id="date-unknown"><span class="form-check-label">Unknown</span></label></div><p id="date-caption" class="small text-body-secondary mt-1">Today</p></div>
+            <div id="season-field" class="mb-4" hidden><label class="form-label" for="watch-season">Applies to</label><select class="form-select" id="watch-season"><option value="">Overall show</option></select></div>
+            <div id="progress-field" class="mb-4" hidden><label class="form-label" for="watch-progress">Progress</label><select id="watch-progress" class="form-select"><option value="started">Started</option><option value="in_progress">In progress</option><option value="completed">Completed the selected scope</option><option value="stopped">Stopped watching</option></select><p class="small text-body-secondary mt-1">A season update doesn't imply completion of the series.</p></div>
+        </div>
+        <div id="interest-field" class="mb-4" hidden><label for="watch-interest" class="form-label">Save to</label><select id="watch-interest" class="form-select"><option value="want">Wishlist</option><option value="not_interested">Not interested</option><option value="none">No preference</option></select></div>
+        <p id="watch-review" class="log-review text-body-secondary"></p><button id="watch-save" class="btn btn-primary" type="submit">Save</button><button id="watch-cancel" class="btn btn-link" type="button">Choose another title</button>
+    </form><div id="log-success" role="status" class="alert alert-success" hidden></div></div>
+    {% elseif screen == 'browse-history' %}
+    <header class="collection-heading"><h1>Browse titles</h1><a class="small" href="{{ applicationUrl }}/import-history">Paste titles instead</a></header>
+    <p class="text-body-secondary">Spot something you’ve watched? Mark it and optionally add a reaction. Review before saving; dates stay unknown. Skipped titles stay unknown.</p>
+    <form id="backfill-filters" class="collection-filters"><label><span class="visually-hidden">Type</span><select name="mediaType" class="form-select"><option value="movie">Movies</option><option value="tv">TV shows</option></select></label><label><span class="visually-hidden">Browse list</span><select name="list" class="form-select"><option value="top_rated">Highly rated</option><option value="popular">Popular</option></select></label><button id="backfill-review" type="button" class="btn btn-primary ms-auto" disabled>Review selected</button></form>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3"><p id="backfill-draft-status" class="small text-body-secondary mb-0" role="status"></p><button id="backfill-clear" class="btn btn-link btn-sm ms-auto" type="button" hidden>Clear selection</button></div>
+    <p class="small text-body-secondary" id="backfill-status" role="status">Loading titles…</p><div id="backfill-grid" class="poster-grid backfill-grid"></div>
+    <nav class="collection-pagination flex-wrap" aria-label="Catalog pages"><button id="backfill-previous" class="btn btn-outline-secondary">Previous</button><form id="backfill-jump" class="d-flex align-items-center gap-2"><label for="backfill-page" class="small text-body-secondary">Page</label><input id="backfill-page" class="form-control form-control-sm" type="number" min="1" max="500" step="1" required inputmode="numeric" style="width:5rem"><button class="btn btn-outline-secondary btn-sm" type="submit">Go</button></form><button id="backfill-next" class="btn btn-outline-secondary">Next</button></nav>
+    <dialog id="backfill-dialog" class="library-sheet"><div class="sheet-heading"><h2>Review history</h2><button id="backfill-close" type="button" class="btn-close" aria-label="Close"></button></div><p class="text-body-secondary">These titles will be recorded as watched, with unknown dates. This won’t assert a viewing count or series completion.</p><div id="backfill-changes"></div><p id="backfill-receipt" role="status"></p><button id="backfill-save" type="button" class="btn btn-primary">Save selected</button></dialog>
+    <dialog id="season-dialog" class="library-sheet" aria-labelledby="season-heading"><div class="sheet-heading"><h2 id="season-heading">Season reactions</h2><button id="season-close" type="button" class="btn-close" aria-label="Close season reactions"></button></div>
+        <div id="season-content"></div>
+    </dialog>
+    {% elseif screen == 'title' %}
+    <a class="back-link" href="{{ applicationUrl }}/library"><i class="bi bi-chevron-left" aria-hidden="true"></i> Library</a>
+    <div id="title-detail" class="title-detail"></div>
+    <section class="title-history"><h2>History</h2><p class="small text-body-secondary">Your saved viewings, reactions, and progress.</p><div id="viewing-history"></div><button id="history-more" class="btn btn-outline-secondary" hidden>More history</button></section>
+    {% elseif screen == 'taste' %}
+    <header class="collection-heading"><h1>Taste</h1><button id="add-taste" class="btn btn-outline-secondary">Add a preference</button></header>
+    <p class="text-body-secondary taste-intro">What you like, what you avoid, and why. Saved here so your model can use it when making recommendations.</p>
+    <div id="taste-statements"></div>
+    <dialog id="taste-edit-dialog" class="library-sheet"><form id="taste-form" class="taste-editor"><h2 id="taste-editor-title">Add a preference</h2><input id="taste-id" type="hidden"><label class="form-label" for="taste-kind">Source</label><select id="taste-kind" class="form-select mb-3"><option value="explicit">My explicit preference</option><option value="approved_insight">Model interpretation I approve</option><option value="imported_context" hidden>Imported context</option></select><label class="form-label" for="taste-statement">Statement</label><textarea class="form-control mb-3" id="taste-statement" rows="6" maxlength="20000" required></textarea><label class="form-label" for="taste-evidence">Supporting watches <span class="text-body-secondary">(required for model interpretations)</span></label><select class="form-select mb-3" id="taste-evidence" multiple size="5"></select><p class="small text-body-secondary">Save stores exactly this statement and its selected evidence.</p><button class="btn btn-primary">Save</button><button id="cancel-taste" type="button" class="btn btn-link">Cancel</button></form></dialog>
+    <dialog id="taste-read-dialog" class="library-sheet"><div class="sheet-heading"><h2 id="taste-read-title"></h2><button id="close-taste" type="button" class="btn-close" aria-label="Close"></button></div><p id="taste-read-source" class="small text-body-secondary"></p><div id="taste-read-body" class="taste-reading"></div><button id="edit-open-taste" type="button" class="btn btn-outline-secondary mt-3">Edit</button></dialog>
+    {% endif %}
+</main>
+{% endblock %}

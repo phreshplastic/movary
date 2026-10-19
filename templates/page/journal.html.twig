@@ -1,0 +1,63 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Import history{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="{{ asset_url('css/journal.css') }}">
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ asset_url('js/journal.js') }}"></script>
+{% endblock %}
+
+{% block body %}
+    <main role="main" class="container">
+        {{ include('component/navbar.html.twig') }}
+
+        <header class="library-heading intake-heading">
+            <a class="small text-decoration-none" href="{{ applicationUrl }}/library"><i class="bi bi-chevron-left" aria-hidden="true"></i> Library</a>
+            <h1 class="mt-3">Import history</h1>
+        </header>
+
+        <section class="journal-card intake-form" aria-labelledby="intake-title">
+            <h2 class="h5" id="intake-title">Paste titles</h2>
+            <p id="step-description" class="text-body-secondary">Paste one title per line, or paste your selection from Browse titles. Review the matches before saving.</p>
+
+            <div id="paste-panel">
+                <div class="mb-3 intake-type"><label class="form-label" for="media-type">Type</label><select class="form-select" id="media-type"><option value="movie">Movies</option><option value="tv">TV shows</option></select></div>
+                <label class="form-label" for="recall">Titles</label>
+                <textarea class="form-control" id="recall" rows="7" spellcheck="false" aria-describedby="recall-help" placeholder="Arrival (2016)&#10;Alien (1979)"></textarea>
+                <div class="form-text" id="recall-help">Accepts: Title (2022) · Watched · Loved · Unknown date<br>Or: Title (2022) | reaction | YYYY-MM-DD | note. A title alone works too. No assessment leaves the reaction blank.</div>
+                <div class="form-check my-3">
+                    <input class="form-check-input" type="checkbox" id="watched-confirmation">
+                    <label class="form-check-label" for="watched-confirmation">I've watched these titles.</label>
+                </div>
+                <button class="btn btn-primary" id="find-matches">Find matches</button>
+            </div>
+
+            <div id="matches-panel" hidden>
+                <div id="matches"></div>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-secondary" id="back-paste">Edit list</button>
+                    <button class="btn btn-primary" id="review-changes">Review changes</button>
+                </div>
+            </div>
+
+            <div id="review-panel" hidden>
+                <div id="changes"></div>
+                <p class="text-body-secondary">Only the changes shown here will be saved. TV records don't imply completion of every season or episode.</p>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-secondary" id="back-matches">Back to matches</button>
+                    <button class="btn btn-primary" id="save-journal">Save changes</button>
+                </div>
+            </div>
+
+            <div id="saved-panel" hidden>
+                <p id="save-summary" class="alert alert-success"></p>
+                <div class="d-flex gap-2"><a class="btn btn-primary" href="{{ applicationUrl }}/library">View library</a><button class="btn btn-outline-secondary" id="add-more">Add more</button></div>
+            </div>
+            <div id="journal-status" class="mt-3 text-body-secondary" role="status" aria-live="polite"></div>
+        </section>
+
+    </main>
+{% endblock %}

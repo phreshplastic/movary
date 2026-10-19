@@ -88,6 +88,17 @@ class TmdbApi
         return $this->client->get('/search/movie', $getParameters);
     }
 
+    /** @return array<string,mixed> */
+    public function searchTv(string $searchTerm, ?Year $year = null, int $page = 1) : array
+    {
+        $parameters = ['query' => urlencode($searchTerm), 'page' => (string)$page];
+        if ($year !== null) {
+            $parameters['first_air_date_year'] = (string)$year;
+        }
+
+        return $this->client->get('/search/tv', $parameters);
+    }
+
     private function findMovie(int $movieId) : array
     {
         try {
