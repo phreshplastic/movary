@@ -173,7 +173,10 @@
             const match = $('selected-title'); match.replaceChildren(poster(candidate.poster, candidate.title, 'selected-poster'));
             const info = el('div'); info.append(el('h2', candidate.title), el('p', `${candidate.year || 'Year unknown'} · ${candidate.mediaType === 'tv' ? 'TV show' : 'Movie'}`, 'text-body-secondary mb-0')); match.append(info);
             $('existing-context').textContent = local ? `${statusLabel(local.viewing_status)}${local.reaction ? ' · ' + local.reaction : ''}` : 'No viewing record in your library yet.';
-            $('watch-reaction').replaceChildren(...reactionSelect(initialAction === 'edit_assessment' ? local?.reaction || '' : '').options);
+            const currentReaction = initialAction === 'edit_assessment' ? local?.reaction || '' : '';
+            // Moving live options can change their selection; clone, then set the value explicitly.
+            $('watch-reaction').replaceChildren(...Array.from(reactionSelect(currentReaction).options, option => option.cloneNode(true)));
+            $('watch-reaction').value = currentReaction;
             $('watch-note').value = initialAction === 'edit_assessment' ? local?.note || '' : '';
             $('watch-interest').value = local?.interest === 'none' ? 'want' : local?.interest || 'want';
             $('watch-action').value = initialAction;
@@ -398,8 +401,40 @@
         };
     }
 
+    function backfillDraftStore(storage, key) {
+        const empty = () => ({version:1, items:[], position:null});
+        function read() {
+            try {
+                const raw = JSON.parse(storage.getItem(key));
+                if (raw?.version !== 1 || !Array.isArray(raw.items)) return empty();
+                const items = new Map();
+                for (const item of raw.items.slice(0,100)) {
+                    if (!['movie','tv'].includes(item?.mediaType) || !Number.isSafeInteger(item.tmdbId) || item.tmdbId < 1 || typeof item.title !== 'string' || !item.title || item.title.length > 500 || typeof item.reaction !== 'string' || item.reaction.length > 2000) continue;
+                    items.set(`${item.mediaType}:${item.tmdbId}`, {mediaType:item.mediaType, tmdbId:item.tmdbId, title:item.title, year:typeof item.year === 'string' ? item.year.slice(0,4) : '', reaction:item.reaction});
+                }
+                const pos = raw.position;
+                const position = pos && ['movie','tv'].includes(pos.mediaType) && ['top_rated','popular'].includes(pos.list) && Number.isInteger(pos.page) && pos.page >= 1 && pos.page <= 500 ? {mediaType:pos.mediaType, list:pos.list, page:pos.page} : null;
+                return {version:1, items:[...items.values()], position};
+            } catch {return empty();}
+        }
+        return {read, update(upserts = [], removals = [], position = null) {
+            const current = read(), items = new Map(current.items.map(item => [`${item.mediaType}:${item.tmdbId}`,item]));
+            for (const id of removals) items.delete(id);
+            for (const item of upserts) items.set(`${item.mediaType}:${item.tmdbId}`, {mediaType:item.mediaType, tmdbId:item.tmdbId, title:item.title, year:item.year || '', reaction:item.reaction || ''});
+            if (items.size > 100) throw new RangeError('Review and save this batch before selecting more than 100 titles.');
+            const next = {version:1, items:[...items.values()], position:position || current.position};
+            storage.setItem(key, JSON.stringify(next));
+            return next;
+        }};
+    }
+
     async function browseHistory() {
-        const selected = new Map();
+        const draftKey = 'personalLibraryBackfillDraftV1';
+        // Access can be denied by browser storage settings; retain an in-memory fallback.
+        const storage = {getItem:key => localStorage.getItem(key), setItem:(key,value) => localStorage.setItem(key,value)};
+        const drafts = backfillDraftStore(storage, draftKey), restored = drafts.read();
+        const selected = new Map(restored.items.map(title => [`${title.mediaType}:${title.tmdbId}`,title]));
+        let draftSaved = true, reviewPlan = null, preparing = false;
         const editSeasons = seasonEditor();
         const dialog = $('backfill-dialog');
         const initialPage = Number(params.get('page'));
@@ -408,9 +443,39 @@
         const browseFilters = $('backfill-filters');
         if (['movie', 'tv'].includes(params.get('mediaType'))) browseFilters.elements.namedItem('mediaType').value = params.get('mediaType');
         if (['top_rated', 'popular'].includes(params.get('list'))) browseFilters.elements.namedItem('list').value = params.get('list');
+        if (!['page','mediaType','list'].some(name => params.has(name)) && restored.position) {
+            pageNumber = restored.position.page;
+            browseFilters.elements.namedItem('mediaType').value = restored.position.mediaType;
+            browseFilters.elements.namedItem('list').value = restored.position.list;
+        }
+        function adopt(state) {selected.clear(); for (const title of state.items) selected.set(key(title), title);}
+        function persist(upserts = [], removals = [], position = null) {
+            if (!draftSaved) upserts = [...selected.values()];
+            try {const state = drafts.update(upserts, removals, position); draftSaved = true; return state;}
+            catch (failure) {draftSaved = false; if (failure instanceof RangeError) throw failure; return null;}
+        }
+        function syncCards() {
+            for (const card of $('backfill-grid').querySelectorAll('[data-draft-key]')) {
+                const choice = selected.get(card.dataset.draftKey), check = card.querySelector('input'), reaction = card.querySelector('select');
+                check.checked = !!choice; reaction.disabled = !choice;
+                if (choice) {if (!Array.from(reaction.options).some(option => option.value === choice.reaction)) reaction.append(new Option(choice.reaction,choice.reaction)); reaction.value = choice.reaction;}
+            }
+        }
+        function updateSelection(title, included) {
+            const previous = selected.get(key(title));
+            if (included) selected.set(key(title),title); else selected.delete(key(title));
+            try {const state = persist(included ? [title] : [], included ? [] : [key(title)]); if (state) adopt(state);}
+            catch (failure) {if (previous) selected.set(key(title),previous); else selected.delete(key(title)); error(failure.message);}
+            syncCards(); counter();
+        }
+        $('backfill-clear').onclick = () => {const ids = [...selected.keys()]; selected.clear(); const state = persist([],ids); if (state) adopt(state); syncCards(); counter();};
+        window.addEventListener('storage', event => {if (event.key !== draftKey || dialog.open || preparing) return; adopt(drafts.read()); syncCards(); counter();});
+
         function counter() {
-            $('backfill-review').disabled = !selected.size || !!pending;
+            $('backfill-review').disabled = !selected.size || !!pending || preparing;
             $('backfill-review').textContent = selected.size ? `Review ${selected.size} selected` : 'Review selected';
+            $('backfill-draft-status').textContent = !draftSaved ? 'Your draft could not be saved on this device. Keep this page open.' : selected.size ? `${selected.size} selected · Draft saved on this device. Review to add to your library.` : 'Your place is saved on this device. Selections stay here until you review and save them.';
+            $('backfill-clear').hidden = !selected.size; $('backfill-clear').disabled = !!pending || dialog.open || preparing;
         }
         function key(title) {return `${title.mediaType}:${title.tmdbId}`;}
         async function load() {
@@ -432,20 +497,22 @@
                     }
                     $('backfill-grid').append(card); continue;
                 }
+                card.dataset.draftKey = key(title);
                 const label = el('label', undefined, 'form-check'); const check = el('input', undefined, 'form-check-input'); check.type = 'checkbox';
                 check.checked = selected.has(key(title)); label.append(check, el('span', 'Watched', 'form-check-label'));
                 const reaction = el('select', undefined, 'form-select form-select-sm mt-2'); reaction.setAttribute('aria-label', `Reaction to ${title.title}`);
                 reaction.append(new Option('No assessment', '')); reactionWords.forEach(word => reaction.append(new Option(word, word)));
                 if (title.existingReaction && !reactionWords.includes(title.existingReaction)) reaction.append(new Option(title.existingReaction, title.existingReaction));
                 reaction.value = selected.get(key(title))?.reaction ?? title.existingReaction ?? ''; reaction.disabled = !check.checked;
-                check.onchange = () => {if (check.checked && selected.size >= 100) {check.checked = false; error('Save this batch before selecting more than 100 titles.'); return;} reaction.disabled = !check.checked; if (check.checked) selected.set(key(title), {...title, reaction:reaction.value}); else selected.delete(key(title)); counter();};
-                reaction.onchange = () => {if (check.checked) selected.set(key(title), {...title, reaction:reaction.value});};
+                check.onchange = () => {if (check.checked && selected.size >= 100) {check.checked = false; error('Save this batch before selecting more than 100 titles.'); return;} updateSelection({...title, reaction:reaction.value}, check.checked);};
+                reaction.onchange = () => {if (check.checked) updateSelection({...title, reaction:reaction.value}, true);};
                 card.append(label, reaction); $('backfill-grid').append(card);
             }
             $('backfill-status').textContent = 'TMDB catalog · 1,000+ votes per title. These lists help recall; they aren’t personalized recommendations.';
             $('backfill-page').value = String(pageNumber);
             const position = new URLSearchParams({...filters, page:String(pageNumber)});
             history.replaceState(null, '', location.pathname + '?' + position);
+            persist([],[],{...filters,page:pageNumber}); counter();
             $('backfill-previous').disabled = pageNumber === 1; $('backfill-next').disabled = nextPage === null;
         }
         $('backfill-jump').onsubmit = event => {
@@ -457,35 +524,71 @@
         $('backfill-filters').onchange = () => {pageNumber = 1; run(load);};
         $('backfill-previous').onclick = () => {pageNumber = Math.max(1,pageNumber - 1); run(load);};
         $('backfill-next').onclick = () => {pageNumber = nextPage || pageNumber; run(load);};
-        $('backfill-review').onclick = () => {
-            $('backfill-changes').replaceChildren(); $('backfill-receipt').textContent = '';
-            for (const title of selected.values()) $('backfill-changes').append(el('p', `${title.title} (${title.year || 'Year unknown'}) · Watched · ${title.reaction || 'No assessment'} · Unknown date`));
-            requestId = stableRequest(); dialog.showModal();
-        };
+        const frozenControls = new Map();
+        function freezeReview(frozen) {
+            if (frozen) for (const control of root.querySelectorAll('#backfill-grid input,#backfill-grid select,#backfill-grid button,#backfill-filters select,#backfill-jump input,#backfill-jump button,#backfill-previous,#backfill-next')) {frozenControls.set(control,control.disabled); control.disabled = true;}
+            else {for (const [control,disabled] of frozenControls) control.disabled = disabled; frozenControls.clear(); syncCards();}
+        }
+        dialog.onclose = () => {if (!pending) {reviewPlan = null; adopt(drafts.read()); syncCards(); counter();}};
+        $('backfill-review').onclick = () => run(async () => {
+            preparing = true; freezeReview(true);
+            $('backfill-review').disabled = true;
+            $('backfill-review').textContent = 'Preparing review…';
+            $('backfill-changes').replaceChildren(); $('backfill-receipt').textContent = ''; $('backfill-save').hidden = false;
+            try {
+                requestId = stableRequest();
+                const changes = Array.from(selected.values(), title => ({action:'confirm_seen', mediaType:title.mediaType, tmdbId:title.tmdbId, reaction:title.reaction, date:null}));
+                let plan = await api('preview', {changes,requestId});
+                const alreadySaved = plan.changes.filter(change => change.before.viewing_status === 'seen');
+                if (alreadySaved.length) {
+                    const ids = alreadySaved.map(change => `${change.after.media_type}:${change.after.tmdb_id}`);
+                    for (const id of ids) selected.delete(id);
+                    persist([],ids);
+                    const remaining = changes.filter(change => !ids.includes(`${change.mediaType}:${change.tmdbId}`));
+                    requestId = stableRequest();
+                    plan = remaining.length ? await api('preview', {changes:remaining,requestId}) : null;
+                    $('backfill-changes').append(el('p', `${alreadySaved.length} already in your library — kept unchanged.`, 'text-body-secondary'));
+                }
+                reviewPlan = plan;
+                for (const change of plan?.changes || []) {
+                    const title = change.after;
+                    $('backfill-changes').append(el('p', `${title.title} (${title.release_year || 'Year unknown'}) · Watched · ${title.reaction || 'No assessment'} · Unknown date`));
+                }
+                $('backfill-save').hidden = !plan;
+                if (!plan) $('backfill-receipt').textContent = 'Everything in this selection is already saved. Nothing to add.';
+                syncCards(); dialog.showModal();
+            } finally {preparing = false; freezeReview(false); counter();}
+        });
         function closeBatch() {
-            if (pending) {selected.clear(); pending = null; location.reload();}
-            else dialog.close();
+            if (pending) {pending = null; location.reload();}
+            else {reviewPlan = null; dialog.close(); adopt(drafts.read()); syncCards(); counter();}
         }
         $('backfill-close').onclick = closeBatch;
         $('backfill-save').onclick = async () => {
             const button = $('backfill-save'); button.disabled = true; button.textContent = 'Saving…';
-            pending ||= Array.from(selected.values(), title => ({action:'confirm_seen', mediaType:title.mediaType, tmdbId:title.tmdbId, reaction:title.reaction, note:title.existingNote || '', date:null}));
+            if (!reviewPlan) return;
+            pending ||= reviewPlan;
             // Freeze this reviewed batch for exact retries; closing after an error reloads authoritative state.
             $('backfill-close').disabled = true; dialog.oncancel = e => e.preventDefault();
             for (const control of root.querySelectorAll('#backfill-grid input,#backfill-grid select,#backfill-filters select,#backfill-jump input,#backfill-jump button,#backfill-previous,#backfill-next')) control.disabled = true;
             counter();
             try {
-                const receipt = await save(pending, requestId);
+                const receipt = await api('commit', {id:pending.id,approval:pending.approval});
                 $('backfill-receipt').textContent = `Saved ${receipt.titleIds.length} titles. Dates remain unknown.`;
-                selected.clear(); pending = null; button.hidden = true;
+                const savedKeys = pending.changes.map(change => `${change.after.media_type}:${change.after.tmdb_id}`);
+                for (const id of savedKeys) selected.delete(id);
+                const state = persist([],savedKeys); if (state) adopt(state);
+                pending = null; reviewPlan = null; button.hidden = true;
                 $('backfill-close').disabled = false; dialog.oncancel = null;
                 dialog.onclose = () => location.reload();
             } catch (failure) {
-                $('backfill-receipt').textContent = failure.message + ' Retry Save selected for this exact batch, or close to reload your saved history.';
+                const needsReview = /library changed|review expired/i.test(failure.message);
+                $('backfill-receipt').textContent = failure.message + (needsReview ? ' Close to reload and review your retained selection again.' : ' Retry Save selected for this exact batch, or close to reload your saved history.');
+                button.hidden = needsReview;
                 $('backfill-close').disabled = false; dialog.oncancel = event => {event.preventDefault(); closeBatch();};
             } finally {button.disabled = false; button.textContent = 'Save selected';}
         };
-        window.addEventListener('beforeunload', event => {if (selected.size || pending) {event.preventDefault(); event.returnValue = '';}});
+        window.addEventListener('beforeunload', event => {if ((!draftSaved && selected.size) || pending) {event.preventDefault(); event.returnValue = '';}});
         await load();
     }
 
